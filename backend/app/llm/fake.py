@@ -82,10 +82,7 @@ class FakeLLMProvider(LLMProvider):
             item = self._queue.popleft()
             if isinstance(item, Exception):
                 raise item
-            if isinstance(item, dict):
-                content = json.dumps(item)
-            else:
-                content = str(item)
+            content = json.dumps(item) if isinstance(item, dict) else str(item)
 
         usage = LLMUsage(
             provider=self._provider_name,

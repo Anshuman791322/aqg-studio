@@ -69,7 +69,7 @@ def build_batch_generation_user_prompt(
             ]
         )
 
-    for idx, bp_data in enumerate(blueprints_with_context, 1):
+    for _idx, bp_data in enumerate(blueprints_with_context, 1):
         bp_id = bp_data["blueprint_id"]
         seq = bp_data["sequence_number"]
         q_type = bp_data["question_type"]

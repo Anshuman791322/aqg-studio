@@ -53,8 +53,8 @@ async def create_assessment(
     except ValueError as val_err:
         err_msg = str(val_err)
         if "not found" in err_msg.lower():
-            raise NotFoundException(message=err_msg, code="DOCUMENT_NOT_FOUND")
-        raise ValidationException(message=err_msg, code="PLANNING_VALIDATION_ERROR")
+            raise NotFoundException(message=err_msg, code="DOCUMENT_NOT_FOUND") from val_err
+        raise ValidationException(message=err_msg, code="PLANNING_VALIDATION_ERROR") from val_err
 
 
 @router.get("", response_model=SuccessResponse[list[AssessmentResponseData]])
@@ -190,8 +190,8 @@ async def generate_questions_endpoint(
     except ValueError as val_err:
         err_msg = str(val_err)
         if "not found" in err_msg.lower():
-            raise NotFoundException(message=err_msg, code="ASSESSMENT_NOT_FOUND")
-        raise ValidationException(message=err_msg, code="GENERATION_VALIDATION_ERROR")
+            raise NotFoundException(message=err_msg, code="ASSESSMENT_NOT_FOUND") from val_err
+        raise ValidationException(message=err_msg, code="GENERATION_VALIDATION_ERROR") from val_err
 
 
 @router.get("/{assessment_id}/questions", response_model=SuccessResponse[list[QuestionResponseData]])

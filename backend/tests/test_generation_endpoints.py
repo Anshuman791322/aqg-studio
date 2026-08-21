@@ -10,8 +10,8 @@ from fastapi.testclient import TestClient
 from jose import jwt
 
 from app.db.session import get_db
-from app.main import app
 from app.generation.schemas import AssessmentGenerationResult, QuestionResponseData
+from app.main import app
 from app.models.entities import (
     Assessment,
     Question,

@@ -186,7 +186,7 @@ def consolidate_knowledge_batches(
                     definition=c_data["definition"],
                     importance_score=c_data["importance_score"],
                     difficulty=c_data["difficulty"],
-                    source_chunk_ids=sorted(list(c_data["source_chunk_ids"])),
+                    source_chunk_ids=sorted(c_data["source_chunk_ids"]),
                 )
             )
         total_concepts += len(concepts_list)
@@ -198,7 +198,7 @@ def consolidate_knowledge_batches(
                 importance_score=t_data["importance_score"],
                 order_index=t_data["order_index"],
                 concepts=concepts_list,
-                source_chunk_ids=sorted(list(t_data["source_chunk_ids"])),
+                source_chunk_ids=sorted(t_data["source_chunk_ids"]),
             )
         )
 

@@ -232,7 +232,7 @@ class QuestionGenerationAgent:
                     cited_pages.extend(chunk_pages[cid])
             if item.supporting_evidence.page_numbers:
                 cited_pages.extend(item.supporting_evidence.page_numbers)
-            unique_pages = sorted(list(set(cited_pages)))
+            unique_pages = sorted(set(cited_pages))
 
             question_entity = Question(
                 id=uuid.uuid4(),
