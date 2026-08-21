@@ -200,8 +200,8 @@ class QuestionGenerationAgent:
 
         # Index returned items by blueprint_id
         items_by_bp: dict[uuid.UUID, GeneratedQuestionItem] = {}
-        for item in batch_output.questions:
-            items_by_bp[item.blueprint_id] = item
+        for q_item in batch_output.questions:
+            items_by_bp[q_item.blueprint_id] = q_item
 
         saved_questions: list[Question] = []
         failed_blueprints: list[QuestionBlueprint] = []
