@@ -1,6 +1,7 @@
 """Hybrid Vector & Lexical RAG Retrieval Service."""
 
 import math
+import re
 import uuid
 from collections.abc import Sequence
 
@@ -15,13 +16,20 @@ from app.retrieval.schemas import RetrievedChunk
 
 logger = get_logger("aqg.retrieval.service")
 
+WORD_REGEX = re.compile(r"\w+", re.UNICODE)
+
+
+def tokenize_words(text: str) -> set[str]:
+    """Tokenize and normalize text into unique alphanumeric lowercase words."""
+    return set(WORD_REGEX.findall(text.lower()))
+
 
 def compute_lexical_overlap_score(query: str, content: str) -> float:
     """Compute normalized token overlap score between query and chunk content."""
-    q_words = set(query.lower().split())
+    q_words = tokenize_words(query)
     if not q_words:
         return 0.0
-    c_words = set(content.lower().split())
+    c_words = tokenize_words(content)
     if not c_words:
         return 0.0
     intersection = q_words.intersection(c_words)

@@ -305,7 +305,7 @@ async def get_document_analysis(
                 name=t.name,
                 description=t.description,
                 importance_score=float(t.importance_score),
-                order_index=t.order_index,
+                order_index=int(t_meta.get("order_index", 0)),
                 concepts=c_list,
                 source_chunk_ids=t_source_ids or [t.id],
             )
@@ -326,6 +326,17 @@ async def get_document_analysis(
 
     doc_meta = dict(doc.metadata_ or {}).get("knowledge_analysis", {})
 
+    key_fact_schemas: list[KeyFactSchema] = []
+    for f in doc_meta.get("key_facts", []):
+        f_source_ids = [uuid.UUID(sid) for sid in f.get("source_chunk_ids", [])]
+        key_fact_schemas.append(
+            KeyFactSchema(
+                fact=f.get("fact", ""),
+                importance_score=float(f.get("importance_score", 1.0)),
+                source_chunk_ids=f_source_ids or [document_id],
+            )
+        )
+
     analysis = KnowledgeAnalysis(
         document_id=document_id,
         analysis_version=doc_meta.get("analysis_version", "1.0.0"),
@@ -333,13 +344,14 @@ async def get_document_analysis(
         estimated_difficulty="medium",
         topics=topic_schemas,
         learning_objectives=obj_schemas,
-        key_facts=[],
+        key_facts=key_fact_schemas,
         total_topics=len(topic_schemas),
         total_concepts=total_concepts,
         total_objectives=len(obj_schemas),
         provider_metadata=doc_meta.get("provider_metadata", {}),
     )
     return SuccessResponse(data=analysis)
+
 
 
 @router.post("/{document_id}/retrieve", response_model=SuccessResponse[RetrievalResponse])

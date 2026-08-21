@@ -38,6 +38,15 @@ def test_lexical_overlap_score_math() -> None:
     assert score_2 == 0.0
 
 
+def test_lexical_overlap_handles_punctuation_and_casing() -> None:
+    """Verify lexical tokenization strips punctuation and matches case-insensitively."""
+    query = "What is DNA?"
+    text = "DNA (Deoxyribonucleic acid) is what stores genetic information."
+    score = compute_lexical_overlap_score(query, text)
+    # 'what', 'is', 'dna' all present
+    assert score == 1.0
+
+
 @pytest.mark.asyncio
 async def test_hybrid_retrieval_ranking() -> None:
     """Verify hybrid retrieval ranks relevant vector & lexical chunks highest."""

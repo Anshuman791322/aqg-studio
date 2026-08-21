@@ -15,6 +15,7 @@ from app.knowledge.schemas import (
     LearningObjectiveSchema,
     TopicSchema,
 )
+from app.llm.errors import LLMTransientError
 from app.llm.fake import FakeLLMProvider
 from app.models.entities import Document, DocumentChunk
 
@@ -281,19 +282,16 @@ async def test_agent_analyze_document_idempotent() -> None:
     agent = KnowledgeAnalysisAgent(llm_provider=fake_llm)
 
     mock_session = AsyncMock()
-    # Mock document select
     mock_doc_result = MagicMock()
     mock_doc_result.scalar_one_or_none.return_value = mock_doc
-
-    # Mock chunks select
     mock_chunks_result = MagicMock()
     mock_chunks_result.scalars.return_value.all.return_value = mock_chunks
 
     mock_session.execute.side_effect = [
         mock_doc_result,
         mock_chunks_result,
-        MagicMock(),  # delete Topics
-        MagicMock(),  # delete Objectives
+        MagicMock(),
+        MagicMock(),
     ]
 
     analysis = await agent.analyze_document(
@@ -341,7 +339,6 @@ async def test_prompt_injection_text_in_document_handled_safely() -> None:
         )
     ]
 
-    # LLM behaves safely and extracts the text content as a concept rather than executing instructions
     safe_response = {
         "topics": [
             {
@@ -384,7 +381,89 @@ async def test_prompt_injection_text_in_document_handled_safely() -> None:
     )
 
     assert analysis.total_topics == 1
-    # Check that system prompt contains security warning
     call_msg = fake_llm.call_history[0]["messages"]
     assert "UNTRUSTED DATA" in call_msg[0].content
     assert "<document_content>" in call_msg[1].content
+
+
+# ------------------------------------------------------------------------------
+# 6. Transaction Rollback & Error Handling
+# ------------------------------------------------------------------------------
+@pytest.mark.asyncio
+async def test_agent_failure_triggers_transaction_rollback() -> None:
+    """Verify that when an error occurs during extraction, the transaction is rolled back."""
+    user_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    mock_doc = Document(
+        id=doc_id,
+        user_id=user_id,
+        original_filename="doc.pdf",
+        storage_path=f"{user_id}/{doc_id}/doc.pdf",
+        mime_type="application/pdf",
+        size_bytes=100,
+    )
+    mock_chunks = [
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            user_id=user_id,
+            chunk_index=0,
+            content="Some text to analyze.",
+            token_count=10,
+        )
+    ]
+
+    fake_llm = FakeLLMProvider(
+        scripted_responses=[LLMTransientError("Upstream API 500", provider="fake")]
+    )
+    agent = KnowledgeAnalysisAgent(llm_provider=fake_llm)
+
+    mock_session = AsyncMock()
+    mock_doc_result = MagicMock()
+    mock_doc_result.scalar_one_or_none.return_value = mock_doc
+    mock_chunks_result = MagicMock()
+    mock_chunks_result.scalars.return_value.all.return_value = mock_chunks
+
+    mock_session.execute.side_effect = [
+        mock_doc_result,
+        mock_chunks_result,
+    ]
+
+    with pytest.raises(LLMTransientError):
+        await agent.analyze_document(mock_session, document_id=doc_id, user_id=user_id)
+
+    assert mock_session.rollback.called
+
+
+@pytest.mark.asyncio
+async def test_agent_rejects_document_with_no_chunks() -> None:
+    """Verify agent raises ValueError when document exists but has no chunks."""
+    user_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    mock_doc = Document(
+        id=doc_id,
+        user_id=user_id,
+        original_filename="empty.pdf",
+        storage_path=f"{user_id}/{doc_id}/empty.pdf",
+        mime_type="application/pdf",
+        size_bytes=100,
+    )
+
+    agent = KnowledgeAnalysisAgent()
+    mock_session = AsyncMock()
+    mock_doc_result = MagicMock()
+    mock_doc_result.scalar_one_or_none.return_value = mock_doc
+    mock_chunks_result = MagicMock()
+    mock_chunks_result.scalars.return_value.all.return_value = []
+
+    mock_session.execute.side_effect = [
+        mock_doc_result,
+        mock_chunks_result,
+    ]
+
+    with pytest.raises(ValueError) as exc_info:
+        await agent.analyze_document(mock_session, document_id=doc_id, user_id=user_id)
+
+    assert "no processed chunks" in str(exc_info.value)
