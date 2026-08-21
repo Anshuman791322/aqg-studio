@@ -1,4 +1,4 @@
-"""Assessment management and Question Blueprint API endpoints."""
+"""Assessment management, Question Blueprint, and Generation API endpoints."""
 
 import uuid
 
@@ -6,9 +6,14 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.planning_agent import QuestionPlanningAgent
+from app.agents.question_generation_agent import QuestionGenerationAgent
 from app.core.auth import CurrentUser, get_current_user
 from app.core.errors import NotFoundException, ValidationException
 from app.db.session import get_db
+from app.generation.schemas import (
+    AssessmentGenerationResult,
+    QuestionResponseData,
+)
 from app.planning.schemas import (
     AssessmentBlueprintResponse,
     AssessmentCreateRequest,
@@ -17,10 +22,12 @@ from app.planning.schemas import (
 )
 from app.repositories.assessment import assessment_repo
 from app.repositories.blueprint import blueprint_repo
+from app.repositories.question import question_repo
 from app.schemas.common import SuccessResponse
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 planning_agent = QuestionPlanningAgent()
+generation_agent = QuestionGenerationAgent()
 
 
 @router.post("", response_model=SuccessResponse[AssessmentBlueprintResponse], status_code=status.HTTP_201_CREATED)
@@ -158,6 +165,80 @@ async def get_assessment_blueprint(
         blueprints=bp_items,
     )
     return SuccessResponse(data=response_data)
+
+
+@router.post("/{assessment_id}/generate", response_model=SuccessResponse[AssessmentGenerationResult])
+async def generate_questions_endpoint(
+    assessment_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession | None = Depends(get_db),
+) -> SuccessResponse[AssessmentGenerationResult]:
+    """Trigger grounded batch question generation for an assessment's pending blueprints."""
+    if db is None:
+        raise ValidationException(message="Database is not available.", code="DATABASE_UNAVAILABLE")
+
+    try:
+        result = await generation_agent.generate_assessment_questions(
+            db,
+            assessment_id=assessment_id,
+            user_id=current_user.user_id,
+        )
+        return SuccessResponse(
+            data=result,
+            message="Question generation completed successfully.",
+        )
+    except ValueError as val_err:
+        err_msg = str(val_err)
+        if "not found" in err_msg.lower():
+            raise NotFoundException(message=err_msg, code="ASSESSMENT_NOT_FOUND")
+        raise ValidationException(message=err_msg, code="GENERATION_VALIDATION_ERROR")
+
+
+@router.get("/{assessment_id}/questions", response_model=SuccessResponse[list[QuestionResponseData]])
+async def list_assessment_questions(
+    assessment_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession | None = Depends(get_db),
+) -> SuccessResponse[list[QuestionResponseData]]:
+    """List all generated questions for an assessment."""
+    if db is None:
+        raise ValidationException(message="Database is not available.", code="DATABASE_UNAVAILABLE")
+
+    # Check assessment exists and belongs to user
+    assessment = await assessment_repo.get_by_id(db, id=assessment_id, user_id=current_user.user_id)
+    if not assessment:
+        raise NotFoundException(
+            message=f"Assessment '{assessment_id}' not found.",
+            code="ASSESSMENT_NOT_FOUND",
+        )
+
+    records = await question_repo.list_by_assessment(
+        db, assessment_id=assessment_id, user_id=current_user.user_id
+    )
+
+    items = [
+        QuestionResponseData(
+            id=q.id,
+            assessment_id=q.assessment_id,
+            blueprint_id=q.blueprint_id,
+            question_type=q.question_type,
+            question_text=q.question_text,
+            options=q.options,
+            correct_answer=q.correct_answer,
+            explanation=q.explanation,
+            topic=q.topic,
+            difficulty=q.difficulty,
+            bloom_level=q.bloom_level,
+            source_chunk_ids=q.source_chunk_ids,
+            source_pages=q.source_pages,
+            supporting_evidence=dict(q.supporting_evidence or {}),
+            status=q.status,
+            version=q.version,
+            created_at=q.created_at,
+        )
+        for q in records
+    ]
+    return SuccessResponse(data=items)
 
 
 @router.delete("/{assessment_id}", response_model=SuccessResponse[dict[str, bool]])

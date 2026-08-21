@@ -92,6 +92,13 @@ class Settings(BaseSettings):
     MAX_DOCUMENT_SIZE_MB: int = Field(default=50)
     MAX_QUESTIONS_PER_BATCH: int = Field(default=50)
 
+    # Question Generation Agent Settings
+    GENERATION_BATCH_SIZE: int = Field(default=3)
+    GENERATION_TEMPERATURE: float = Field(default=0.3)
+    GENERATION_MAX_RETRIES: int = Field(default=2)
+    GENERATION_RAG_TOP_K: int = Field(default=5)
+    GENERATION_MAX_CHUNK_CHARS: int = Field(default=3000)
+
 
 @lru_cache
 def get_settings() -> Settings:

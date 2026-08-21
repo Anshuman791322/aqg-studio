@@ -15,9 +15,9 @@ This document tracks the verified completion status, deliverables, verification 
 | **04** | **Document Processing & Parsing Engine** | **COMPLETED** | 2026-08-21 | 77 backend tests passing (PDF/DOCX/PPTX/TXT parsers, header removal, scanned PDF detection, chunking 600-900 tokens, 10% overlap, lifecycle endpoints), Next.js 15 build |
 | **05** | **Model Provider Abstraction & Gateway** | **COMPLETED** | 2026-08-21 | 87 backend tests passing (OpenRouter, NVIDIA NIM, fake provider, structured output with 1-shot repair, jittered backoff, fallback failover, request budgeting, zero-leak logging) |
 | **06** | **Knowledge Retrieval, Embeddings & RAG** | **COMPLETED** | 2026-08-21 | 101 backend tests passing (Map-and-reduce knowledge extraction, anti-injection prompt boundary, topic/concept deduplication, FastEmbed & NVIDIA embeddings, hybrid vector/lexical retrieval) |
-| **07** | **Question Planning & Blueprint Agent** | **COMPLETED** | 2026-08-21 | 113 backend tests passing (Hamilton-Hare Largest Remainder Method, deterministic slot allocation, no question text in blueprints, assessment REST endpoints) |
-| **08** | **Question Generation & Fallback Gateway** | READY | Pending | OpenRouter + NVIDIA fallback failover integration tests |
-| **09** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
+| **07** | **Question Planning & Blueprint Agent** | **COMPLETED** | 2026-08-21 | 117 backend tests passing (Hamilton-Hare Largest Remainder Method, deterministic slot allocation, no question text in blueprints, assessment REST endpoints) |
+| **08** | **Question Generation & Fallback Gateway** | **COMPLETED** | 2026-08-21 | 129 backend tests passing (Batched generation, per-blueprint RAG, multi-type validation, prompt injection defense, draft persistence) |
+| **09** | **Evaluation & Refinement Agent** | READY | Pending | 5-metric scoring tests, iterative refinement loop test |
 | **10** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
 | **11** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
 | **12** | **Multi-Format Export Engine** | PLANNED | Pending | PDF, DOCX, Moodle XML, GIFT, QTI 2.1 exporter compliance tests |
@@ -93,10 +93,21 @@ This document tracks the verified completion status, deliverables, verification 
   - **Deterministic Allocation**: Hamilton-Hare Largest Remainder Method distributing exact integer question counts across types, difficulties, Bloom levels, and topics without LLM math hallucination.
   - **Question Planning Agent**: Structured design pipeline assigning topics, concepts, Bloom taxonomy objectives, chunk citations, and pedagogic rationales without writing premature question wording.
   - **Assessment Endpoints**: `POST /api/v1/assessments`, `GET /api/v1/assessments`, `GET /api/v1/assessments/{id}`, `GET /api/v1/assessments/{id}/blueprint`, `DELETE /api/v1/assessments/{id}`.
+- **Verification**: 117/117 tests passed, Next.js 15 build clean.
+
+---
+
+### Phase 08: Question Generation & Fallback Gateway
+- **Status**: **COMPLETED & VERIFIED** (2026-08-21)
+- **Scope**:
+  - **Grounded Generation Agent**: Batched question generation for `mcq_single`, `mcq_multi`, `true_false`, `short_answer`, and `descriptive` question types with per-blueprint hybrid RAG retrieval.
+  - **Validation Engine**: Independent per-item validation enforcing exact 4-option MCQ constraints, distinct options, ban on lazy distractors, correct answer alignment, and strict source chunk citation subsets.
+  - **Resilient Batch Handling**: Partial batch success isolation, individual retry fallback for failed blueprint items with reduced batch size, and prompt-injection defense tags.
+  - **Endpoints**: `POST /api/v1/assessments/{id}/generate`, `GET /api/v1/assessments/{id}/questions`, `GET /api/v1/questions/{id}`.
 - **Verification Commands Run**:
-  - `python -m pytest -v tests/` (113/113 tests passed)
-  - `python -m ruff check .` (0 lint errors across 77 source files)
-  - `python -m mypy app` (Strict type checking passed on 77 source files)
+  - `python -m pytest -v tests/` (129/129 tests passed)
+  - `python -m ruff check .` (0 lint errors across 82 source files)
+  - `python -m mypy app` (Strict type checking passed on 82 source files)
   - `npx eslint .` (0 frontend lint errors)
   - `npx tsc --noEmit` (0 frontend type errors)
   - `npm test` (0 failures)

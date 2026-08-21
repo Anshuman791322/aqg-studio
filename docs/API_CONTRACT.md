@@ -144,7 +144,10 @@
 | `GET` | `/api/v1/assessments` | List all assessments for authenticated user | Authenticated |
 | `GET` | `/api/v1/assessments/{assessment_id}` | Retrieve details for a specific assessment | Authenticated |
 | `GET` | `/api/v1/assessments/{assessment_id}/blueprint` | Retrieve question blueprints in sequence order | Authenticated |
-| `DELETE` | `/api/v1/assessments/{assessment_id}` | Delete assessment and associated blueprints | Authenticated |
+| `POST` | `/api/v1/assessments/{assessment_id}/generate` | Trigger grounded batch question generation | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}/questions` | List generated questions with evidence and citations | Authenticated |
+| `DELETE` | `/api/v1/assessments/{assessment_id}` | Delete assessment and associated blueprints/questions | Authenticated |
+
 
 
 ---

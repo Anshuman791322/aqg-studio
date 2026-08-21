@@ -109,9 +109,9 @@ aqg-studio/
 | **05** | **Model Provider Gateway** | OpenRouter & NVIDIA fallback, 1-shot repair, zero-leak logging | **Completed** |
 | **06** | **Knowledge Retrieval & RAG** | Vector embeddings, hybrid retrieval, map-and-reduce knowledge analysis | **Completed** |
 | **07** | **Question Planning Agent** | Blueprint generation, Bloom taxonomy matrix, quota planning | **Completed** |
-| **08** | **Question Generation Agent** | Grounded question generation with OpenRouter + NVIDIA fallback| Ready |
+| **08** | **Question Generation Agent** | Grounded question generation with OpenRouter + NVIDIA fallback| **Completed** |
+| **09** | **Evaluation & Refinement** | 5-metric automated quality grading & iterative revision loop | Ready |
 
-| **09** | **Evaluation & Refinement** | 5-metric automated quality grading & iterative revision loop | Planned |
 | **10** | **Output & Report Agent** | Quality scorecard, hallucination index, assessment bundler | Planned |
 | **11** | **Human Review Studio** | Interactive UI for editing, approving, and refining items | Planned |
 | **12** | **Multi-Format Export** | Export to PDF, DOCX, Moodle XML, GIFT, QTI 2.1, JSON, CSV | Planned |
