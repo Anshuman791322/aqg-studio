@@ -41,7 +41,7 @@ def compute_cosine_similarity(vec_a: list[float], vec_b: list[float]) -> float:
     """Compute cosine similarity between two float vectors."""
     if not vec_a or not vec_b or len(vec_a) != len(vec_b):
         return 0.0
-    dot = sum(a * b for a, b in zip(vec_a, vec_b))
+    dot = sum(a * b for a, b in zip(vec_a, vec_b, strict=True))
     norm_a = math.sqrt(sum(a * a for a in vec_a))
     norm_b = math.sqrt(sum(b * b for b in vec_b))
     if norm_a == 0.0 or norm_b == 0.0:
@@ -97,7 +97,6 @@ class HybridRetrievalService:
 
         # 2. Generate query vector embedding if available
         query_vector: list[float] | None = None
-        retrieval_mode = "hybrid"
 
         try:
             query_vector = await self.embedding_provider.embed_query(query)
@@ -106,7 +105,6 @@ class HybridRetrievalService:
                 f"Embedding generation failed ({str(e)}), falling back to lexical-only retrieval.",
                 extra={"document_id": str(document_id)},
             )
-            retrieval_mode = "lexical"
 
         scored_results: list[RetrievedChunk] = []
 

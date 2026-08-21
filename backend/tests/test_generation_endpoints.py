@@ -11,6 +11,7 @@ from jose import jwt
 
 from app.db.session import get_db
 from app.main import app
+from app.generation.schemas import AssessmentGenerationResult, QuestionResponseData
 from app.models.entities import (
     Assessment,
     Question,
@@ -109,78 +110,40 @@ def test_generate_questions_endpoint_success() -> None:
         empty_res,  # existing questions
     ]
 
-    fake_generated_item = {
-        "questions": [
-            {
-                "blueprint_id": str(mock_bp.id),
-                "question_type": "mcq_single",
-                "question_text": "Which nitrogenous base pairs with Adenine in DNA?",
-                "options": [
-                    {"key": "A", "text": "Thymine"},
-                    {"key": "B", "text": "Cytosine"},
-                    {"key": "C", "text": "Guanine"},
-                    {"key": "D", "text": "Uracil"},
-                ],
-                "correct_answer": "A",
-                "explanation": "Adenine forms two hydrogen bonds with Thymine in DNA.",
-                "topic": "Genetics",
-                "difficulty": "easy",
-                "bloom_level": "remember",
-                "supporting_evidence": {
-                    "source_chunk_ids": [str(chunk_id)],
-                    "verbatim_excerpt": "Adenine selectively binds to Thymine.",
-                },
-            }
-        ]
-    }
-
     async def override_get_db():
         return mock_session
 
     app.dependency_overrides[get_db] = override_get_db
 
-    with (
-        patch("app.agents.question_generation_agent.get_llm_gateway") as mock_gateway,
-        patch("app.api.v1.endpoints.assessments.generation_agent.llm") as agent_llm,
+    fake_res = AssessmentGenerationResult(
+        assessment_id=assessment_id,
+        total_blueprints=1,
+        generated_questions=1,
+        failed_blueprints=0,
+        status="ready",
+        questions=[
+            QuestionResponseData(
+                id=uuid.uuid4(),
+                assessment_id=assessment_id,
+                blueprint_id=mock_bp.id,
+                question_type="mcq_single",
+                question_text="Which base pairs with Adenine?",
+                options=[{"key": "A", "text": "Thymine"}],
+                correct_answer="A",
+                explanation="Adenine pairs with Thymine.",
+                difficulty="easy",
+                bloom_level="remember",
+            )
+        ],
+    )
+    with patch(
+        "app.api.v1.endpoints.assessments.generation_agent.generate_assessment_questions",
+        AsyncMock(return_value=fake_res),
     ):
-        agent_llm.complete_structured = AsyncMock(
-            return_value=(
-                MagicMock(questions=[MagicMock()]),
-                MagicMock(),
-            )
+        res = client.post(
+            f"/api/v1/assessments/{assessment_id}/generate",
+            headers=headers,
         )
-        # Mock generate_assessment_questions directly to test endpoint layer
-        from app.generation.schemas import AssessmentGenerationResult, QuestionResponseData
-
-        fake_res = AssessmentGenerationResult(
-            assessment_id=assessment_id,
-            total_blueprints=1,
-            generated_questions=1,
-            failed_blueprints=0,
-            status="ready",
-            questions=[
-                QuestionResponseData(
-                    id=uuid.uuid4(),
-                    assessment_id=assessment_id,
-                    blueprint_id=mock_bp.id,
-                    question_type="mcq_single",
-                    question_text="Which base pairs with Adenine?",
-                    options=[{"key": "A", "text": "Thymine"}],
-                    correct_answer="A",
-                    explanation="Adenine pairs with Thymine.",
-                    difficulty="easy",
-                    bloom_level="remember",
-                )
-            ],
-        )
-        with patch(
-            "app.api.v1.endpoints.assessments.generation_agent.generate_assessment_questions",
-            AsyncMock(return_value=fake_res),
-        ):
-            res = client.post(
-                f"/api/v1/assessments/{assessment_id}/generate",
-                headers=headers,
-            )
 
     assert res.status_code == 200
     data = res.json()
