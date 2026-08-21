@@ -282,6 +282,7 @@ async def test_agent_analyze_document_idempotent() -> None:
     agent = KnowledgeAnalysisAgent(llm_provider=fake_llm)
 
     mock_session = AsyncMock()
+    mock_session.add = MagicMock()
     mock_doc_result = MagicMock()
     mock_doc_result.scalar_one_or_none.return_value = mock_doc
     mock_chunks_result = MagicMock()
@@ -364,6 +365,7 @@ async def test_prompt_injection_text_in_document_handled_safely() -> None:
     agent = KnowledgeAnalysisAgent(llm_provider=fake_llm)
 
     mock_session = AsyncMock()
+    mock_session.add = MagicMock()
     mock_doc_result = MagicMock()
     mock_doc_result.scalar_one_or_none.return_value = mock_doc
     mock_chunks_result = MagicMock()

@@ -3,7 +3,7 @@
 import time
 import uuid
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -213,6 +213,7 @@ async def test_body_user_id_tampering_overridden_by_authenticated_user() -> None
     }
 
     mock_session = AsyncMock()
+    mock_session.add = MagicMock()
     created = await document_repo.create(
         mock_session,
         obj_in=untrusted_payload,

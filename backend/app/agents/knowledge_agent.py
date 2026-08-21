@@ -30,23 +30,62 @@ class KnowledgeAnalysisAgent:
 
     def _create_chunk_batches(
         self, chunks: list[DocumentChunk], max_tokens_per_batch: int = 2500
-    ) -> list[list[DocumentChunk]]:
-        """Partition document chunks into bounded token batches."""
+    ) -> list[list[dict[str, Any]]]:
+        """Partition document chunks into bounded token batches, splitting oversized chunks if needed."""
         if not chunks:
             return []
 
-        batches: list[list[DocumentChunk]] = []
-        current_batch: list[DocumentChunk] = []
+        batches: list[list[dict[str, Any]]] = []
+        current_batch: list[dict[str, Any]] = []
         current_tokens = 0
 
         for chunk in chunks:
-            chunk_tokens = chunk.token_count or len(chunk.content.split())
+            raw_content = chunk.content
+            chunk_tokens = chunk.token_count or len(raw_content.split())
+
+            # If a single chunk is larger than max_tokens_per_batch, slice it into sub-windows
+            if chunk_tokens > max_tokens_per_batch:
+                words = raw_content.split()
+                step = max_tokens_per_batch
+                for i in range(0, len(words), step):
+                    sub_words = words[i : i + step]
+                    sub_content = " ".join(sub_words)
+                    sub_dict = {
+                        "id": chunk.id,
+                        "chunk_index": chunk.chunk_index,
+                        "section": chunk.section,
+                        "content": sub_content,
+                        "token_count": len(sub_words),
+                    }
+                    if current_batch:
+                        batches.append(current_batch)
+                        current_batch = []
+                        current_tokens = 0
+                    batches.append([sub_dict])
+                continue
+
             if current_batch and (current_tokens + chunk_tokens > max_tokens_per_batch):
                 batches.append(current_batch)
-                current_batch = [chunk]
+                current_batch = [
+                    {
+                        "id": chunk.id,
+                        "chunk_index": chunk.chunk_index,
+                        "section": chunk.section,
+                        "content": chunk.content,
+                        "token_count": chunk_tokens,
+                    }
+                ]
                 current_tokens = chunk_tokens
             else:
-                current_batch.append(chunk)
+                current_batch.append(
+                    {
+                        "id": chunk.id,
+                        "chunk_index": chunk.chunk_index,
+                        "section": chunk.section,
+                        "content": chunk.content,
+                        "token_count": chunk_tokens,
+                    }
+                )
                 current_tokens += chunk_tokens
 
         if current_batch:
@@ -102,13 +141,13 @@ class KnowledgeAnalysisAgent:
 
             # 3. Map Phase: Extract knowledge from each chunk batch
             for b_idx, batch in enumerate(batches):
-                batch_valid_ids = {c.id for c in batch}
+                batch_valid_ids = {c["id"] for c in batch}
                 chunk_dicts = [
                     {
-                        "id": c.id,
-                        "chunk_index": c.chunk_index,
-                        "section": c.section,
-                        "content": c.content,
+                        "id": c["id"],
+                        "chunk_index": c["chunk_index"],
+                        "section": c["section"],
+                        "content": c["content"],
                     }
                     for c in batch
                 ]
