@@ -4,11 +4,29 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 QuestionType = Literal["mcq", "mcq_single", "mcq_multi", "true_false", "short_answer", "descriptive"]
 DifficultyLevel = Literal["easy", "medium", "hard"]
 BloomLevel = Literal["remember", "understand", "apply", "analyze", "evaluate", "create"]
+
+ALLOWED_QUESTION_TYPES: set[str] = {
+    "mcq",
+    "mcq_single",
+    "mcq_multi",
+    "true_false",
+    "short_answer",
+    "descriptive",
+}
+ALLOWED_DIFFICULTIES: set[str] = {"easy", "medium", "hard"}
+ALLOWED_BLOOM_LEVELS: set[str] = {
+    "remember",
+    "understand",
+    "apply",
+    "analyze",
+    "evaluate",
+    "create",
+}
 
 
 class AssessmentCreateRequest(BaseModel):
@@ -40,6 +58,42 @@ class AssessmentCreateRequest(BaseModel):
     include_answers: bool = True
     include_explanations: bool = True
     include_source_references: bool = True
+
+    @field_validator("question_type_distribution", mode="before")
+    @classmethod
+    def validate_type_distribution(cls, v: dict[str, float] | None) -> dict[str, float] | None:
+        if v is None:
+            return v
+        for k in v:
+            if k.lower() not in ALLOWED_QUESTION_TYPES:
+                raise ValueError(
+                    f"Unsupported question type '{k}'. Allowed types: {sorted(ALLOWED_QUESTION_TYPES)}"
+                )
+        return v
+
+    @field_validator("difficulty_distribution", mode="before")
+    @classmethod
+    def validate_diff_distribution(cls, v: dict[str, float] | None) -> dict[str, float] | None:
+        if v is None:
+            return v
+        for k in v:
+            if k.lower() not in ALLOWED_DIFFICULTIES:
+                raise ValueError(
+                    f"Unsupported difficulty level '{k}'. Allowed: {sorted(ALLOWED_DIFFICULTIES)}"
+                )
+        return v
+
+    @field_validator("bloom_distribution", mode="before")
+    @classmethod
+    def validate_bloom_distribution(cls, v: dict[str, float] | None) -> dict[str, float] | None:
+        if v is None:
+            return v
+        for k in v:
+            if k.lower() not in ALLOWED_BLOOM_LEVELS:
+                raise ValueError(
+                    f"Unsupported Bloom level '{k}'. Allowed: {sorted(ALLOWED_BLOOM_LEVELS)}"
+                )
+        return v
 
 
 class QuestionBlueprintItemSchema(BaseModel):
@@ -110,4 +164,3 @@ class PlanningRefinementOutput(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     items: list[PlanningSlotRefinementItem]
-

@@ -81,6 +81,49 @@ def test_create_assessment_validation_failure_on_invalid_totals() -> None:
     assert res_oversized.status_code == 422
 
 
+def test_create_assessment_validation_failure_on_invalid_distribution_keys() -> None:
+    """Verify POST /api/v1/assessments returns 422 on unsupported distribution keys."""
+    user_id = uuid.uuid4()
+    headers = create_test_auth_headers(user_id)
+
+    # Invalid question type key
+    res_type = client.post(
+        "/api/v1/assessments",
+        headers=headers,
+        json={
+            "document_id": str(uuid.uuid4()),
+            "name": "Bad Type",
+            "question_type_distribution": {"invalid_type": 100},
+        },
+    )
+    assert res_type.status_code == 422
+
+    # Invalid difficulty key
+    res_diff = client.post(
+        "/api/v1/assessments",
+        headers=headers,
+        json={
+            "document_id": str(uuid.uuid4()),
+            "name": "Bad Diff",
+            "difficulty_distribution": {"super_hard": 100},
+        },
+    )
+    assert res_diff.status_code == 422
+
+    # Invalid bloom key
+    res_bloom = client.post(
+        "/api/v1/assessments",
+        headers=headers,
+        json={
+            "document_id": str(uuid.uuid4()),
+            "name": "Bad Bloom",
+            "bloom_distribution": {"guess": 100},
+        },
+    )
+    assert res_bloom.status_code == 422
+
+
+
 def test_create_assessment_endpoint_success() -> None:
     """Verify POST /api/v1/assessments creates assessment and returns blueprint design."""
     user_id = uuid.uuid4()

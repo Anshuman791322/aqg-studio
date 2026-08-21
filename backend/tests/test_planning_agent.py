@@ -5,6 +5,7 @@ from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pydantic import ValidationError
 
 from app.agents.planning_agent import QuestionPlanningAgent
 from app.llm.fake import FakeLLMProvider
@@ -47,7 +48,46 @@ def test_largest_remainder_one_item_assessment() -> None:
 
 
 # ------------------------------------------------------------------------------
-# 2. Slot Skeleton Builder Tests
+# 2. Schema Validation for Distribution Keys
+# ------------------------------------------------------------------------------
+def test_invalid_question_type_distribution_raises_validation_error() -> None:
+    """Verify request schema rejects unsupported question types."""
+    with pytest.raises(ValidationError) as exc_info:
+        AssessmentCreateRequest(
+            document_id=uuid.uuid4(),
+            name="Invalid Types",
+            total_questions=5,
+            question_type_distribution={"unsupported_type": 100},
+        )
+    assert "Unsupported question type" in str(exc_info.value)
+
+
+def test_invalid_difficulty_distribution_raises_validation_error() -> None:
+    """Verify request schema rejects unsupported difficulty levels."""
+    with pytest.raises(ValidationError) as exc_info:
+        AssessmentCreateRequest(
+            document_id=uuid.uuid4(),
+            name="Invalid Difficulty",
+            total_questions=5,
+            difficulty_distribution={"super_hard": 100},
+        )
+    assert "Unsupported difficulty level" in str(exc_info.value)
+
+
+def test_invalid_bloom_distribution_raises_validation_error() -> None:
+    """Verify request schema rejects unsupported Bloom cognitive levels."""
+    with pytest.raises(ValidationError) as exc_info:
+        AssessmentCreateRequest(
+            document_id=uuid.uuid4(),
+            name="Invalid Bloom",
+            total_questions=5,
+            bloom_distribution={"memorize": 100},
+        )
+    assert "Unsupported Bloom level" in str(exc_info.value)
+
+
+# ------------------------------------------------------------------------------
+# 3. Slot Skeleton Builder Tests
 # ------------------------------------------------------------------------------
 def test_build_blueprint_slots_exact_counts_and_stability() -> None:
     """Verify slot builder generates exact requested slot count with valid distributions."""
@@ -91,7 +131,7 @@ def test_build_blueprint_slots_exact_counts_and_stability() -> None:
 
 
 # ------------------------------------------------------------------------------
-# 3. Question Planning Agent Execution Tests
+# 4. Question Planning Agent Execution Tests
 # ------------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_planning_agent_creates_blueprints_without_final_questions() -> None:
