@@ -14,8 +14,10 @@ def sanitize_filename(filename: str) -> str:
     if not raw:
         return "unnamed_document"
 
+    # Normalize backslashes to forward slashes for cross-platform safety
+    normalized = raw.replace("\\", "/")
     # Strip any leading/trailing paths
-    name = Path(raw).name
+    name = Path(normalized).name
     # Replace unsafe characters with underscore
     sanitized = SAFE_FILENAME_REGEX.sub("_", name)
     # Strip leading dots and underscores to avoid hidden/empty files
