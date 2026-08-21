@@ -59,14 +59,26 @@ AQG Studio enforces defense-in-depth across database, storage, authentication, a
   - The Next.js frontend only consumes `NEXT_PUBLIC_*` variables (`NEXT_PUBLIC_API_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`).
   - The `SUPABASE_SERVICE_ROLE_KEY` is **never** provided to the frontend or checked into version control.
 - **LLM API Keys**:
-  - `OPENROUTER_API_KEY` and `NVIDIA_NIM_API_KEY` reside exclusively in the backend runtime environment.
+  - `OPENROUTER_API_KEY` and `NVIDIA_API_KEY` reside exclusively in the backend runtime environment.
 - **Correlation ID Tracking**:
   - Incoming requests are assigned a unique `X-Correlation-ID` header.
   - Logs and API error responses correlate without exposing internal database stack traces or confidential prompt parameters to the client.
 
 ---
 
-## 4. Threat Model & Mitigations
+## 4. LLM Telemetry, Secret Redaction & Logging Safety (Phase 5)
+
+- **Zero-Leak Logging**:
+  - The backend logger strictly prohibits logging API keys, authorization bearer tokens, uploaded document text, or full prompt bodies.
+  - Log records are constrained to safe metadata: `provider`, `model`, `latency_ms`, `total_tokens`, `messages_count`, and `request_id`.
+- **Request Budget Enforcement**:
+  - `FallbackLLMGateway` tracks daily / session LLM requests (`LLM_MAX_DAILY_REQUEST_BUDGET`) to prevent denial-of-wallet and quota exhaustion attacks.
+- **Controlled Error Sanitization**:
+  - Model provider error details are sanitized before propagation to client error responses, preventing leakage of upstream service topologies or token balances.
+
+---
+
+## 5. Threat Model & Mitigations
 
 | Threat | Impact | Mitigation |
 | :--- | :--- | :--- |
@@ -75,4 +87,5 @@ AQG Studio enforces defense-in-depth across database, storage, authentication, a
 | **Request Body User ID Spoofing** | Attacker creating resources under victim account | Repository methods unconditionally force `CurrentUser.user_id` from verified token |
 | **Cross-Tenant Document Access** | Unauthorized reading of proprietary educational content | Storage RLS + Database table RLS + Repository user-scoping on all backend queries |
 | **Path Traversal File Overwrite** | Malicious upload overwriting system files | `sanitize_filename` strips `..` and special characters; path generated deterministically as `{user_id}/{doc_id}/{filename}` |
-| **LLM Token Exhaustion / DoS** | Free-tier token exhaustion across users | Per-user rate-limiting and daily quota tracking in `llm_usage_daily` table |
+| **LLM Key Exposure** | Upstream account compromise / unauthorized usage | Keys restricted to server-side env vars only; never referenced in frontend or logs |
+| **LLM Token Exhaustion / DoS** | Free-tier token exhaustion across users | Per-user rate-limiting and application request budget in `FallbackLLMGateway` |

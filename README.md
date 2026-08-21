@@ -105,10 +105,10 @@ aqg-studio/
 | **01** | **Application Foundation**| FastAPI backend & Next.js 15 frontend foundations, strict typing, tests | **Completed** |
 | **02** | **Supabase & RLS** | PostgreSQL schema, pgvector, storage buckets, RLS security policies | **Completed** |
 | **03** | **User Authentication** | Supabase Auth, Next.js cookie sessions, JWT verification, dashboard shell | **Completed** |
-| **04** | **Document Processing Engine**| Parsers for PDF, DOCX, PPTX, TXT with structural chunking | Ready |
-| **05** | **Vector Retrieval & RAG** | Vector embeddings, pgvector cosine search, hybrid retrieval| Planned |
-| **06** | **Knowledge Analysis Agent** | Topic clustering, concept extraction, difficulty landscape | Planned |
-| **07** | **Question Planning Agent** | Blueprint generation, Bloom taxonomy matrix, quota planning | Planned |
+| **04** | **Document Processing Engine**| Parsers for PDF, DOCX, PPTX, TXT with structural chunking | **Completed** |
+| **05** | **Model Provider Gateway** | OpenRouter & NVIDIA fallback, 1-shot repair, zero-leak logging | **Completed** |
+| **06** | **Chunking, Embeddings & pgvector RAG** | Vector embeddings, pgvector cosine search, hybrid retrieval| Ready |
+| **07** | **Knowledge Analysis Agent** | Topic clustering, concept extraction, difficulty landscape | Planned |
 | **08** | **Question Generation Agent** | Grounded question generation with OpenRouter + NVIDIA fallback| Planned |
 | **09** | **Evaluation & Refinement** | 5-metric automated quality grading & iterative revision loop | Planned |
 | **10** | **Output & Report Agent** | Quality scorecard, hallucination index, assessment bundler | Planned |

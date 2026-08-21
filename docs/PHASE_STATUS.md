@@ -13,16 +13,16 @@ This document tracks the verified completion status, deliverables, verification 
 | **02** | **Supabase Schema, Migrations & RLS** | **COMPLETED** | 2026-08-21 | 44 backend tests passing (models, repositories, storage, isolation), RLS SQL |
 | **03** | **User Authentication & Authorization** | **COMPLETED (REMEDIATED)** | 2026-08-21 | 56 backend tests passing (JWT signatures, expiration, aud, sub, body tampering), Next.js SSR Auth & Dashboard |
 | **04** | **Document Processing & Parsing Engine** | **COMPLETED** | 2026-08-21 | 77 backend tests passing (PDF/DOCX/PPTX/TXT parsers, header removal, scanned PDF detection, chunking 600-900 tokens, 10% overlap, lifecycle endpoints), Next.js 15 build |
-| **05** | **Chunking, Embeddings & pgvector RAG** | READY | Pending | Cosine vector search benchmarks, token window chunk tests |
-| **06** | **Knowledge Retrieval & Analysis Agent** | PLANNED | Pending | Concept extraction tests, topic hierarchy JSON validation |
-| **07** | **Question Planning & Blueprint Agent** | PLANNED | Pending | Blueprint quota math verification, Bloom distribution checks |
-| **08** | **Question Generation & Fallback Gateway** | PLANNED | Pending | OpenRouter + NVIDIA fallback failover integration tests |
-| **09** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
-| **10** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
-| **11** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
-| **12** | **Multi-Format Export Engine** | PLANNED | Pending | PDF, DOCX, Moodle XML, GIFT, QTI 2.1 exporter compliance tests |
-| **13** | **Next.js Frontend & Studio Dashboard** | PLANNED | Pending | End-to-end UI rendering, SSE live streaming, review studio |
-| **14** | **End-to-End Testing & Deployment** | PLANNED | Pending | Integration test suite, Vercel & Render staging deploy |
+| **05** | **Model Provider Abstraction & Gateway** | **COMPLETED** | 2026-08-21 | 87 backend tests passing (OpenRouter, NVIDIA NIM, fake provider, structured output with 1-shot repair, jittered backoff, fallback failover, request budgeting, zero-leak logging) |
+| **06** | **Chunking, Embeddings & pgvector RAG** | READY | Pending | Cosine vector search benchmarks, token window chunk tests |
+| **07** | **Knowledge Retrieval & Analysis Agent** | PLANNED | Pending | Concept extraction tests, topic hierarchy JSON validation |
+| **08** | **Question Planning & Blueprint Agent** | PLANNED | Pending | Blueprint quota math verification, Bloom distribution checks |
+| **09** | **Question Generation & Fallback Gateway** | PLANNED | Pending | OpenRouter + NVIDIA fallback failover integration tests |
+| **10** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
+| **11** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
+| **12** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
+| **13** | **Multi-Format Export Engine** | PLANNED | Pending | PDF, DOCX, Moodle XML, GIFT, QTI 2.1 exporter compliance tests |
+| **14** | **Next.js Frontend & Studio Dashboard** | PLANNED | Pending | End-to-end UI rendering, SSE live streaming, review studio |
 
 ---
 
@@ -52,48 +52,30 @@ This document tracks the verified completion status, deliverables, verification 
 ### Phase 03: User Authentication & Authorization
 - **Status**: **COMPLETED (REMEDIATED & VERIFIED)** (2026-08-21)
 - **Scope**:
-  - **Backend**:
-    - Signature-verified Supabase JWT verification (`verify_supabase_jwt`) with strict expiration, audience, subject UUID, algorithm, and prefix normalization.
-    - Typed `CurrentUser` dependency injected into FastAPI endpoints.
-    - Authenticated endpoint `GET /api/v1/auth/me` (and `/api/v1/me`) returning user profile and quota metrics.
-    - Body `user_id` tampering protection across repository operations.
-  - **Frontend**:
-    - Supabase browser and server client utilities with Next.js App Router cookie sessions.
-    - Next.js middleware for route protection (`/dashboard`) and safe `returnUrl` redirects.
-    - Auth routes: `/auth/sign-in`, `/auth/sign-up`, `/auth/callback`, `/auth/sign-out`.
-    - Protected dashboard shell displaying user profile, quotas, and module actions.
-    - API client auto-attaching current access token.
+  - **Backend**: Signature-verified Supabase JWT verification (`verify_supabase_jwt`), `CurrentUser` dependency, `GET /api/v1/auth/me`.
+  - **Frontend**: Supabase browser and server SSR clients, route protection middleware (`/dashboard`), auth routes (`/auth/sign-in`, `/auth/sign-up`, `/auth/callback`, `/auth/sign-out`), protected dashboard.
 - **Verification**: 56/56 tests passed, Next.js 15 build clean.
 
 ---
 
 ### Phase 04: Document Processing & Parsing Engine
 - **Status**: **COMPLETED & VERIFIED** (2026-08-21)
+- **Scope**: Deterministic parsers for PDF (header/footer removal, scanned PDF detection), DOCX (headings, tables, zip bomb defense), PPTX (slides, notes), TXT/MD; linguistic cleaner; hierarchical semantic chunker (600–900 tokens, 10% overlap); document endpoints (`/api/v1/documents/*`).
+- **Verification**: 77/77 tests passed, Next.js 15 build clean.
+
+---
+
+### Phase 05: Model Provider Abstraction & Gateway
+- **Status**: **COMPLETED & VERIFIED** (2026-08-21)
 - **Scope**:
-  - **Deterministic Parsers**:
-    - PyMuPDF (`PDFDocumentParser`): page extraction, repeated running header/footer deduplication, scanned PDF heuristic detection (`needs_ocr` status when text density < 60 chars/page), password-encrypted PDF handling.
-    - `python-docx` (`DOCXDocumentParser`): heading hierarchy parsing, table extraction, zip bomb defense, legacy `.doc` rejection with actionable conversion message.
-    - `python-pptx` (`PPTXDocumentParser`): slide title extraction, shape and table text extraction, speaker notes extraction, slide-to-page indexing.
-    - Plain text / Markdown (`TXTDocumentParser`): multi-encoding support (UTF-8, Latin-1, CP1252), Markdown header structure extraction.
-  - **Linguistic Utilities & Cleaners**:
-    - Whitespace and control-character normalization.
-    - Conservative dehyphenation.
-    - Stopword frequency language detection across English, Spanish, French, German, Italian, Portuguese, and Hindi.
-    - Token estimation via `tiktoken` (`cl100k_base`) with character-ratio fallback.
-    - SHA-256 checksum calculation.
-  - **Hierarchical Chunker**:
-    - Target window 600–900 tokens, max 1,200 tokens, ~10% overlap (~75 tokens).
-    - Heading and paragraph boundary awareness.
-    - Non-empty guarantees, deterministic 0-indexed chunking, SHA-256 chunk content hash.
-  - **API Endpoints & Orchestration**:
-    - `POST /api/v1/documents/initiate`: Limits & format validation, creates document record, returns private storage path `<user_id>/<document_id>/<sanitized_filename>`.
-    - `POST /api/v1/documents/{document_id}/complete`: Confirms upload and marks document queued.
-    - `POST /api/v1/documents/{document_id}/process`: Deterministic processing service idempotently replacing chunks and setting status.
-    - `GET /api/v1/documents`, `GET /api/v1/documents/{id}`, `DELETE /api/v1/documents/{id}`, `GET /api/v1/documents/{id}/chunks`.
+  - **Provider Abstractions**: `LLMProvider` base protocol, `OpenRouterProvider` (`openrouter/free`), `NVIDIAProvider` (`meta/llama-3.3-70b-instruct`), `FakeLLMProvider` for offline test mocking.
+  - **Fallback Gateway**: `FallbackLLMGateway` supporting sequential failover (`LLM_PROVIDER_ORDER`), exponential backoff with random jitter, non-retryable short circuits on `LLMInvalidInputError`, rate limit / timeout / 5xx retries, and application-level request budget protection (`LLM_MAX_DAILY_REQUEST_BUDGET`).
+  - **Structured Generation Pipeline**: Works on arbitrary models without requiring native JSON mode; cleans markdown code fences, validates against Pydantic models, and executes at most 1 controlled repair pass before raising `LLMStructuredOutputError`.
+  - **Zero-Leak Logging**: Absolute redaction of API keys, source text, and sensitive prompts from all log outputs.
 - **Verification Commands Run**:
-  - `python -m pytest -v tests/` (77/77 tests passed)
-  - `python -m ruff check .` (0 lint errors across 46 source files)
-  - `python -m mypy app` (Strict type checking passed on 46 source files)
+  - `python -m pytest -v tests/` (87/87 tests passed)
+  - `python -m ruff check .` (0 lint errors across 54 source files)
+  - `python -m mypy app` (Strict type checking passed on 54 source files)
   - `npx eslint .` (0 frontend lint errors)
   - `npx tsc --noEmit` (0 frontend type errors)
   - `npm test` (0 failures)

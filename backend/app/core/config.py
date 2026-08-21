@@ -53,26 +53,37 @@ class Settings(BaseSettings):
         default=["http://localhost:3000", "http://127.0.0.1:3000"]
     )
 
-    # Database Settings (Optional in Phase 1 foundation)
+    # Database Settings
     DATABASE_URL: str | None = Field(default=None)
     DIRECT_URL: str | None = Field(default=None)
     DB_ECHO_LOG: bool = Field(default=False)
 
-    # Supabase Settings (Optional in Phase 1)
+    # Supabase Settings
     NEXT_PUBLIC_SUPABASE_URL: str | None = Field(default=None)
     NEXT_PUBLIC_SUPABASE_ANON_KEY: str | None = Field(default=None)
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
     SUPABASE_JWT_SECRET: str | None = Field(default=None)
     JWT_ALGORITHM: str = Field(default="HS256")
 
-    # LLM Settings (Optional in Phase 1)
+    # LLM Settings & Provider Order
+    LLM_PROVIDER_ORDER: str = Field(default="openrouter,nvidia")
+    LLM_REQUEST_TIMEOUT_SECONDS: float = Field(default=60.0)
+    LLM_MAX_RETRIES: int = Field(default=2)
+    LLM_BACKOFF_BASE_SECONDS: float = Field(default=0.5)
+    LLM_BACKOFF_MAX_SECONDS: float = Field(default=5.0)
+    LLM_MAX_DAILY_REQUEST_BUDGET: int = Field(default=1000)
+
     OPENROUTER_API_KEY: str | None = Field(default=None)
     OPENROUTER_BASE_URL: str = Field(default="https://openrouter.ai/api/v1")
     OPENROUTER_PRIMARY_MODEL: str = Field(default="anthropic/claude-3.5-sonnet")
+    OPENROUTER_MODEL: str = Field(default="openrouter/free")
+    OPENROUTER_APP_TITLE: str = Field(default="AQG Studio")
+    OPENROUTER_HTTP_REFERER: str = Field(default="https://aqg.studio")
 
     NVIDIA_API_KEY: str | None = Field(default=None)
     NVIDIA_BASE_URL: str = Field(default="https://integrate.api.nvidia.com/v1")
     NVIDIA_FALLBACK_MODEL: str = Field(default="meta/llama-3.3-70b-instruct")
+    NVIDIA_MODEL: str = Field(default="meta/llama-3.3-70b-instruct")
 
     # Embeddings & System Limits
     EMBEDDING_PROVIDER: str = Field(default="fastembed")

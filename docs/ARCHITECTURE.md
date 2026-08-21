@@ -185,9 +185,9 @@ class AssessmentJobState(TypedDict):
 
 ---
 
-## 5. LLM Provider Fallback Gateway
+## 5. LLM Provider Fallback Gateway & Structured Output
 
-To guarantee 99.9% pipeline reliability without relying on single-vendor uptime, all LLM calls are routed through a provider gateway:
+To guarantee 99.9% pipeline reliability without relying on single-vendor uptime, all LLM calls are routed through a provider gateway (`backend/app/llm/`):
 
 ```
                       ┌────────────────────────────┐
@@ -198,23 +198,29 @@ To guarantee 99.9% pipeline reliability without relying on single-vendor uptime,
                       ┌────────────────────────────┐
                       │  Primary Provider:         │
                       │  OpenRouter API            │
-                      │  (Claude-3.5 / Llama-3.3)  │
+                      │  (openrouter/free)         │
                       └─────────────┬──────────────┘
                                     │
-                       Success? ────┼──── Error / Rate Limit (429/5xx) / Timeout
-                      │             │
+                       Success? ────┼──── Transient Error (429/5xx) / Timeout / NetError
+                      │             │     (Retry with Jittered Exponential Backoff)
                       ▼             ▼
              [Return Result]  ┌────────────────────────────┐
                               │  Fallback Provider:        │
                               │  NVIDIA NIM API            │
-                              │  (Llama-3.3-70B-Instruct)  │
+                              │  (meta/llama-3.3-70b)      │
                               └─────────────┬──────────────┘
                                             │
                                Success? ────┼──── Error
                               │             │
                               ▼             ▼
-                     [Return Result]  [Raise Typed FallbackException]
+                     [Return Result]  [Raise LLMAllProvidersFailedError]
 ```
+
+### Structured Output & Controlled 1-Pass Repair
+1. The engine constructs a strict JSON Schema definition embedded in system instructions.
+2. The initial response is extracted, harmless Markdown fences (````json ... ````) are stripped, and content is parsed into Pydantic models.
+3. If schema validation fails, a controlled repair prompt feeds the exact validation error back to the model for a single corrective pass.
+4. If validation succeeds, typed domain entities are returned; if repair fails, typed `LLMStructuredOutputError` is raised.
 
 ---
 
