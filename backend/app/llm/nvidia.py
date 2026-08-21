@@ -40,8 +40,9 @@ class NVIDIAProvider(LLMProvider):
     ) -> None:
         self.api_key = api_key or settings.NVIDIA_API_KEY
         self.base_url = (base_url or settings.NVIDIA_BASE_URL).rstrip("/")
-        self._default_model = default_model or getattr(
-            settings, "NVIDIA_MODEL", settings.NVIDIA_FALLBACK_MODEL
+        self._default_model = str(
+            default_model
+            or getattr(settings, "NVIDIA_MODEL", settings.NVIDIA_PRIMARY_MODEL)
         )
         self.client = client
         self.default_timeout = timeout

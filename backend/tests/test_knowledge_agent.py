@@ -171,7 +171,7 @@ def test_consolidate_knowledge_batches_merging() -> None:
                 concepts=[
                     ConceptSchema(
                         name="DNA",
-                        definition="Deoxyribonucleic acid is a polymer composed of two polynucleotide chains.",  # Longer, better def
+                        definition="Deoxyribonucleic acid is a double-helix polymer.",
                         importance_score=0.99,
                         source_chunk_ids=[cid2],
                     )
@@ -201,7 +201,7 @@ def test_consolidate_knowledge_batches_merging() -> None:
     assert len(topic.concepts) == 1
     concept = topic.concepts[0]
     assert concept.name == "DNA"
-    assert "polymer composed of two polynucleotide chains" in concept.definition
+    assert "double-helix" in concept.definition
     assert set(concept.source_chunk_ids) == {cid1, cid2}
 
     # Verify objective deduplicated
@@ -311,7 +311,7 @@ async def test_agent_analyze_document_idempotent() -> None:
 # ------------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_prompt_injection_text_in_document_handled_safely() -> None:
-    """Verify that chunks containing adversarial prompts are enclosed in untrusted tags and structured."""
+    """Verify that chunks with adversarial prompts are enclosed in untrusted tags."""
     user_id = uuid.uuid4()
     doc_id = uuid.uuid4()
     chunk_id = uuid.uuid4()

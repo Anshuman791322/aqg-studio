@@ -171,7 +171,7 @@ async def test_structured_response_with_markdown_fences() -> None:
 # ------------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_structured_response_one_repair_attempt_success() -> None:
-    """Verify that when initial output is invalid, exactly 1 repair attempt executes and succeeds."""
+    """Verify that when initial output is invalid, exactly 1 repair attempt executes."""
     # Attempt 1: Invalid JSON (missing options list)
     invalid_json = '{"stem": "What is DNA?", "correct_answer": "Deoxyribonucleic acid"}'
     # Attempt 2 (Repair): Valid JSON

@@ -137,12 +137,15 @@
 
 ---
 
-### 2.4 Assessment Blueprints
+### 2.4 Assessments & Question Blueprints
 | Method | Path | Description | Access |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/blueprints` | Create or auto-generate an assessment blueprint | Authenticated |
-| `GET` | `/api/v1/blueprints/{blueprint_id}` | Retrieve specific blueprint specifications | Authenticated |
-| `PUT` | `/api/v1/blueprints/{blueprint_id}` | Update question counts, difficulty ratios & Bloom distribution | Authenticated |
+| `POST` | `/api/v1/assessments` | Create assessment and generate deterministic question blueprints | Authenticated |
+| `GET` | `/api/v1/assessments` | List all assessments for authenticated user | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}` | Retrieve details for a specific assessment | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}/blueprint` | Retrieve question blueprints in sequence order | Authenticated |
+| `DELETE` | `/api/v1/assessments/{assessment_id}` | Delete assessment and associated blueprints | Authenticated |
+
 
 ---
 

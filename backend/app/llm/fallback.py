@@ -73,9 +73,9 @@ class FallbackLLMGateway(LLMProvider):
 
     async def _calculate_backoff_delay(self, attempt: int) -> float:
         """Compute exponential backoff delay with random jitter."""
-        exponential = self.base_backoff_seconds * (2 ** attempt)
-        jitter = random.uniform(0.05, 0.25)
-        delay = min(exponential + jitter, self.max_backoff_seconds)
+        exponential = float(self.base_backoff_seconds * (2 ** attempt))
+        jitter = float(random.uniform(0.05, 0.25))
+        delay = float(min(exponential + jitter, self.max_backoff_seconds))
         return delay
 
     async def complete_chat(

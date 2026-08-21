@@ -37,7 +37,7 @@ class FastEmbedProvider(EmbeddingProvider):
         """Lazy load FastEmbed model on first invocation."""
         if self._model is None and self._is_available:
             try:
-                from fastembed import TextEmbedding  # type: ignore[import-untyped]
+                from fastembed import TextEmbedding
 
                 self._model = TextEmbedding(model_name=self.model_name)
                 logger.info(f"Initialized FastEmbed model: {self.model_name}")

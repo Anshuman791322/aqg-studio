@@ -13,6 +13,7 @@ from app.core.errors import NotFoundException, ValidationException
 from app.db.session import get_db
 from app.knowledge.schemas import (
     ConceptSchema,
+    KeyFactSchema,
     KnowledgeAnalysis,
     LearningObjectiveSchema,
     TopicSchema,
@@ -249,8 +250,9 @@ async def get_document_analysis(
     topic_stmt = (
         select(Topic)
         .where(Topic.document_id == document_id, Topic.user_id == current_user.user_id)
-        .order_by(Topic.order_index.asc())
+        .order_by(Topic.importance_score.desc(), Topic.created_at.asc())
     )
+
     topic_res = await db.execute(topic_stmt)
     topics = list(topic_res.scalars().all())
 

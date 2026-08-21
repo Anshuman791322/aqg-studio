@@ -43,7 +43,6 @@ def test_lexical_overlap_handles_punctuation_and_casing() -> None:
     query = "What is DNA?"
     text = "DNA (Deoxyribonucleic acid) is what stores genetic information."
     score = compute_lexical_overlap_score(query, text)
-    # 'what', 'is', 'dna' all present
     assert score == 1.0
 
 
@@ -56,9 +55,7 @@ async def test_hybrid_retrieval_ranking() -> None:
     fake_embedder = FakeEmbeddingProvider(dimension=384)
     service = HybridRetrievalService(embedding_provider=fake_embedder)
 
-    # Embed query and chunks
     query_text = "photosynthesis in chloroplasts"
-    q_vec = await fake_embedder.embed_query(query_text)
 
     chunk_1_text = "Photosynthesis occurs inside chloroplasts using chlorophyll."
     chunk_1_vec = await fake_embedder.embed_query(chunk_1_text)
@@ -100,7 +97,6 @@ async def test_hybrid_retrieval_ranking() -> None:
     )
 
     assert len(results) == 2
-    # Chunk 1 about photosynthesis should score higher than chunk 2
     assert results[0].chunk_id == mock_chunk_1.id
     assert results[0].score > results[1].score
     assert results[0].retrieval_mode == "hybrid"
@@ -108,7 +104,7 @@ async def test_hybrid_retrieval_ranking() -> None:
 
 @pytest.mark.asyncio
 async def test_lexical_only_fallback_when_embeddings_absent() -> None:
-    """Verify retrieval falls back gracefully to lexical scoring when chunks lack vector embeddings."""
+    """Verify retrieval falls back gracefully to lexical scoring when embeddings are absent."""
     user_id = uuid.uuid4()
     doc_id = uuid.uuid4()
 
@@ -144,19 +140,17 @@ async def test_lexical_only_fallback_when_embeddings_absent() -> None:
 
     assert len(results) == 1
     assert results[0].retrieval_mode == "lexical"
-    assert results[0].score == 1.0  # Perfect token overlap
+    assert results[0].score == 1.0
 
 
 @pytest.mark.asyncio
 async def test_cross_user_isolation_in_retrieval() -> None:
     """Verify that retrieval query returns empty list when user does not own the document."""
-    user_id_a = uuid.uuid4()
     user_id_b = uuid.uuid4()
     doc_id = uuid.uuid4()
 
     service = HybridRetrievalService()
 
-    # Session mock returning empty because user_id_b query finds no matching records
     mock_session = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []

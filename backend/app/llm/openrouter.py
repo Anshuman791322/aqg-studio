@@ -42,8 +42,9 @@ class OpenRouterProvider(LLMProvider):
     ) -> None:
         self.api_key = api_key or settings.OPENROUTER_API_KEY
         self.base_url = (base_url or settings.OPENROUTER_BASE_URL).rstrip("/")
-        self._default_model = default_model or getattr(
-            settings, "OPENROUTER_MODEL", settings.OPENROUTER_PRIMARY_MODEL
+        self._default_model = str(
+            default_model
+            or getattr(settings, "OPENROUTER_MODEL", settings.OPENROUTER_PRIMARY_MODEL)
         )
         self.app_title = app_title or getattr(settings, "OPENROUTER_APP_TITLE", "AQG Studio")
         self.http_referer = http_referer or getattr(

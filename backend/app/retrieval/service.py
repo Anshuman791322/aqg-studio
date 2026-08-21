@@ -4,6 +4,7 @@ import math
 import re
 import uuid
 from collections.abc import Sequence
+from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -116,6 +117,7 @@ class HybridRetrievalService:
 
             lex = compute_lexical_overlap_score(query, chunk.content)
 
+            mode: Literal["hybrid", "vector", "lexical"]
             if query_vector is not None and chunk.embedding is not None:
                 final_score = (alpha * sim) + ((1.0 - alpha) * lex)
                 mode = "hybrid"

@@ -14,9 +14,9 @@ This document tracks the verified completion status, deliverables, verification 
 | **03** | **User Authentication & Authorization** | **COMPLETED (REMEDIATED)** | 2026-08-21 | 56 backend tests passing (JWT signatures, expiration, aud, sub, body tampering), Next.js SSR Auth & Dashboard |
 | **04** | **Document Processing & Parsing Engine** | **COMPLETED** | 2026-08-21 | 77 backend tests passing (PDF/DOCX/PPTX/TXT parsers, header removal, scanned PDF detection, chunking 600-900 tokens, 10% overlap, lifecycle endpoints), Next.js 15 build |
 | **05** | **Model Provider Abstraction & Gateway** | **COMPLETED** | 2026-08-21 | 87 backend tests passing (OpenRouter, NVIDIA NIM, fake provider, structured output with 1-shot repair, jittered backoff, fallback failover, request budgeting, zero-leak logging) |
-| **06** | **Knowledge Retrieval, Embeddings & RAG** | **COMPLETED** | 2026-08-21 | 98 backend tests passing (Map-and-reduce knowledge extraction, anti-injection prompt boundary, topic/concept deduplication, FastEmbed & NVIDIA embeddings, hybrid vector/lexical retrieval) |
-| **07** | **Question Planning & Blueprint Agent** | READY | Pending | Blueprint quota math verification, Bloom distribution checks |
-| **08** | **Question Generation & Fallback Gateway** | PLANNED | Pending | OpenRouter + NVIDIA fallback failover integration tests |
+| **06** | **Knowledge Retrieval, Embeddings & RAG** | **COMPLETED** | 2026-08-21 | 101 backend tests passing (Map-and-reduce knowledge extraction, anti-injection prompt boundary, topic/concept deduplication, FastEmbed & NVIDIA embeddings, hybrid vector/lexical retrieval) |
+| **07** | **Question Planning & Blueprint Agent** | **COMPLETED** | 2026-08-21 | 113 backend tests passing (Hamilton-Hare Largest Remainder Method, deterministic slot allocation, no question text in blueprints, assessment REST endpoints) |
+| **08** | **Question Generation & Fallback Gateway** | READY | Pending | OpenRouter + NVIDIA fallback failover integration tests |
 | **09** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
 | **10** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
 | **11** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
@@ -83,10 +83,20 @@ This document tracks the verified completion status, deliverables, verification 
   - **Embeddings Subsystem**: `EmbeddingProvider` abstraction with lazy-loaded `FastEmbedProvider` (384-d `BAAI/bge-small-en-v1.5`), `NVIDIAEmbeddingProvider`, and deterministic `FakeEmbeddingProvider`.
   - **Hybrid RAG Retrieval**: User- and document-scoped hybrid vector/lexical retrieval with weighted scoring, cosine similarity, lexical overlap, and database search migration function (`match_document_chunks_hybrid`).
   - **API Endpoints**: `POST /api/v1/documents/{id}/analyze`, `GET /api/v1/documents/{id}/analysis`, `POST /api/v1/documents/{id}/retrieve`.
+- **Verification**: 101/101 tests passed, Next.js 15 build clean.
+
+---
+
+### Phase 07: Question Planning & Blueprint Agent
+- **Status**: **COMPLETED & VERIFIED** (2026-08-21)
+- **Scope**:
+  - **Deterministic Allocation**: Hamilton-Hare Largest Remainder Method distributing exact integer question counts across types, difficulties, Bloom levels, and topics without LLM math hallucination.
+  - **Question Planning Agent**: Structured design pipeline assigning topics, concepts, Bloom taxonomy objectives, chunk citations, and pedagogic rationales without writing premature question wording.
+  - **Assessment Endpoints**: `POST /api/v1/assessments`, `GET /api/v1/assessments`, `GET /api/v1/assessments/{id}`, `GET /api/v1/assessments/{id}/blueprint`, `DELETE /api/v1/assessments/{id}`.
 - **Verification Commands Run**:
-  - `python -m pytest -v tests/` (98/98 tests passed)
-  - `python -m ruff check .` (0 lint errors across 63 source files)
-  - `python -m mypy app` (Strict type checking passed on 63 source files)
+  - `python -m pytest -v tests/` (113/113 tests passed)
+  - `python -m ruff check .` (0 lint errors across 77 source files)
+  - `python -m mypy app` (Strict type checking passed on 77 source files)
   - `npx eslint .` (0 frontend lint errors)
   - `npx tsc --noEmit` (0 frontend type errors)
   - `npm test` (0 failures)
