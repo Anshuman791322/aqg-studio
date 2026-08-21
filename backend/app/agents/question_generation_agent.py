@@ -209,7 +209,7 @@ class QuestionGenerationAgent:
         # 3. Validate Each Item Independently & Persist
         for bp in blueprints:
             item = items_by_bp.get(bp.id)
-            if not item:
+            if item is None:
                 logger.warning(f"Blueprint {bp.id} was omitted in LLM batch output.")
                 failed_blueprints.append(bp)
                 continue

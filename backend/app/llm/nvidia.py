@@ -42,7 +42,7 @@ class NVIDIAProvider(LLMProvider):
         self.base_url = (base_url or settings.NVIDIA_BASE_URL).rstrip("/")
         self._default_model = str(
             default_model
-            or getattr(settings, "NVIDIA_MODEL", settings.NVIDIA_PRIMARY_MODEL)
+            or getattr(settings, "NVIDIA_MODEL", settings.NVIDIA_DEFAULT_MODEL)
         )
         self.client = client
         self.default_timeout = timeout

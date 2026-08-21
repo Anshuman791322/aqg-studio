@@ -46,10 +46,7 @@ async def create_assessment(
             request=payload,
             user_id=current_user.user_id,
         )
-        return SuccessResponse(
-            data=blueprint_response,
-            message="Assessment and question blueprints created successfully.",
-        )
+        return SuccessResponse(data=blueprint_response)
     except ValueError as val_err:
         err_msg = str(val_err)
         if "not found" in err_msg.lower():
@@ -183,10 +180,7 @@ async def generate_questions_endpoint(
             assessment_id=assessment_id,
             user_id=current_user.user_id,
         )
-        return SuccessResponse(
-            data=result,
-            message="Question generation completed successfully.",
-        )
+        return SuccessResponse(data=result)
     except ValueError as val_err:
         err_msg = str(val_err)
         if "not found" in err_msg.lower():
@@ -258,7 +252,4 @@ async def delete_assessment(
             code="ASSESSMENT_NOT_FOUND",
         )
 
-    return SuccessResponse(
-        data={"deleted": True},
-        message=f"Assessment '{assessment_id}' deleted successfully.",
-    )
+    return SuccessResponse(data={"deleted": True})
