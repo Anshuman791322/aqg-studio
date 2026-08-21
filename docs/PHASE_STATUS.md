@@ -14,15 +14,15 @@ This document tracks the verified completion status, deliverables, verification 
 | **03** | **User Authentication & Authorization** | **COMPLETED (REMEDIATED)** | 2026-08-21 | 56 backend tests passing (JWT signatures, expiration, aud, sub, body tampering), Next.js SSR Auth & Dashboard |
 | **04** | **Document Processing & Parsing Engine** | **COMPLETED** | 2026-08-21 | 77 backend tests passing (PDF/DOCX/PPTX/TXT parsers, header removal, scanned PDF detection, chunking 600-900 tokens, 10% overlap, lifecycle endpoints), Next.js 15 build |
 | **05** | **Model Provider Abstraction & Gateway** | **COMPLETED** | 2026-08-21 | 87 backend tests passing (OpenRouter, NVIDIA NIM, fake provider, structured output with 1-shot repair, jittered backoff, fallback failover, request budgeting, zero-leak logging) |
-| **06** | **Chunking, Embeddings & pgvector RAG** | READY | Pending | Cosine vector search benchmarks, token window chunk tests |
-| **07** | **Knowledge Retrieval & Analysis Agent** | PLANNED | Pending | Concept extraction tests, topic hierarchy JSON validation |
-| **08** | **Question Planning & Blueprint Agent** | PLANNED | Pending | Blueprint quota math verification, Bloom distribution checks |
-| **09** | **Question Generation & Fallback Gateway** | PLANNED | Pending | OpenRouter + NVIDIA fallback failover integration tests |
-| **10** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
-| **11** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
-| **12** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
-| **13** | **Multi-Format Export Engine** | PLANNED | Pending | PDF, DOCX, Moodle XML, GIFT, QTI 2.1 exporter compliance tests |
-| **14** | **Next.js Frontend & Studio Dashboard** | PLANNED | Pending | End-to-end UI rendering, SSE live streaming, review studio |
+| **06** | **Knowledge Retrieval, Embeddings & RAG** | **COMPLETED** | 2026-08-21 | 98 backend tests passing (Map-and-reduce knowledge extraction, anti-injection prompt boundary, topic/concept deduplication, FastEmbed & NVIDIA embeddings, hybrid vector/lexical retrieval) |
+| **07** | **Question Planning & Blueprint Agent** | READY | Pending | Blueprint quota math verification, Bloom distribution checks |
+| **08** | **Question Generation & Fallback Gateway** | PLANNED | Pending | OpenRouter + NVIDIA fallback failover integration tests |
+| **09** | **Evaluation & Refinement Agent** | PLANNED | Pending | 5-metric scoring tests, iterative refinement loop test |
+| **10** | **Output & Quality Report Agent** | PLANNED | Pending | Scorecard calculation tests, hallucination rate metrics |
+| **11** | **Human-in-the-Loop Review Workflows** | PLANNED | Pending | Question approval/rejection/editing endpoint tests |
+| **12** | **Multi-Format Export Engine** | PLANNED | Pending | PDF, DOCX, Moodle XML, GIFT, QTI 2.1 exporter compliance tests |
+| **13** | **Next.js Frontend & Studio Dashboard** | PLANNED | Pending | End-to-end UI rendering, SSE live streaming, review studio |
+| **14** | **End-to-End Testing & Deployment** | PLANNED | Pending | Integration test suite, Vercel & Render staging deploy |
 
 ---
 
@@ -72,10 +72,21 @@ This document tracks the verified completion status, deliverables, verification 
   - **Fallback Gateway**: `FallbackLLMGateway` supporting sequential failover (`LLM_PROVIDER_ORDER`), exponential backoff with random jitter, non-retryable short circuits on `LLMInvalidInputError`, rate limit / timeout / 5xx retries, and application-level request budget protection (`LLM_MAX_DAILY_REQUEST_BUDGET`).
   - **Structured Generation Pipeline**: Works on arbitrary models without requiring native JSON mode; cleans markdown code fences, validates against Pydantic models, and executes at most 1 controlled repair pass before raising `LLMStructuredOutputError`.
   - **Zero-Leak Logging**: Absolute redaction of API keys, source text, and sensitive prompts from all log outputs.
+- **Verification**: 87/87 tests passed, Next.js 15 build clean.
+
+---
+
+### Phase 06: Knowledge Retrieval, Embeddings & RAG
+- **Status**: **COMPLETED & VERIFIED** (2026-08-21)
+- **Scope**:
+  - **Knowledge Extraction Agent**: Map-and-reduce workflow grouping chunks into bounded token batches, enforcing prompt-injection defenses and strict source citations, sanitizing hallucinated chunk IDs, and merging topics and concepts deterministically.
+  - **Embeddings Subsystem**: `EmbeddingProvider` abstraction with lazy-loaded `FastEmbedProvider` (384-d `BAAI/bge-small-en-v1.5`), `NVIDIAEmbeddingProvider`, and deterministic `FakeEmbeddingProvider`.
+  - **Hybrid RAG Retrieval**: User- and document-scoped hybrid vector/lexical retrieval with weighted scoring, cosine similarity, lexical overlap, and database search migration function (`match_document_chunks_hybrid`).
+  - **API Endpoints**: `POST /api/v1/documents/{id}/analyze`, `GET /api/v1/documents/{id}/analysis`, `POST /api/v1/documents/{id}/retrieve`.
 - **Verification Commands Run**:
-  - `python -m pytest -v tests/` (87/87 tests passed)
-  - `python -m ruff check .` (0 lint errors across 54 source files)
-  - `python -m mypy app` (Strict type checking passed on 54 source files)
+  - `python -m pytest -v tests/` (98/98 tests passed)
+  - `python -m ruff check .` (0 lint errors across 63 source files)
+  - `python -m mypy app` (Strict type checking passed on 63 source files)
   - `npx eslint .` (0 frontend lint errors)
   - `npx tsc --noEmit` (0 frontend type errors)
   - `npm test` (0 failures)

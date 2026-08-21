@@ -128,11 +128,12 @@
 
 ---
 
-### 2.3 Knowledge Analysis & Topics
+### 2.3 Knowledge Analysis, Topics & RAG Retrieval
 | Method | Path | Description | Access |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/knowledge/analyze/{document_id}`| Trigger Knowledge Retrieval & Analysis Agent | Authenticated |
-| `GET` | `/api/v1/knowledge/{document_id}` | Retrieve extracted topics, concepts & hierarchy | Authenticated |
+| `POST` | `/api/v1/documents/{document_id}/analyze` | Trigger Knowledge Retrieval & Analysis Agent | Authenticated |
+| `GET` | `/api/v1/documents/{document_id}/analysis` | Retrieve extracted topics, concepts & hierarchy | Authenticated |
+| `POST` | `/api/v1/documents/{document_id}/retrieve` | Hybrid vector & lexical chunk retrieval | Authenticated |
 
 ---
 
