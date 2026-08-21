@@ -37,6 +37,8 @@ jobs:
 
       - name: Run Pytest Test Suite
         run: pytest -v tests/
+        env:
+          PYTHONPATH: .
 
   frontend-ci:
     name: Frontend Lint, Typecheck & Build (Node 20)
