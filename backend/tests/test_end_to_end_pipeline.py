@@ -18,15 +18,15 @@ import uuid
 from decimal import Decimal
 
 import pytest
-from reportlab.pdfgen import canvas
-
-from app.embeddings.factory import get_embedding_provider
-from app.evaluation.deterministic import validate_question_deterministic
 from app.exports.csv_exporter import generate_csv_export
 from app.exports.docx_exporter import generate_docx_export
 from app.exports.json_exporter import generate_json_export
 from app.exports.pdf_exporter import generate_pdf_export
 from app.exports.shuffler import shuffle_assessment_questions
+from reportlab.pdfgen import canvas
+
+from app.embeddings.factory import get_embedding_provider
+from app.evaluation.deterministic import validate_question_deterministic
 from app.models.entities import (
     Assessment,
     Concept,

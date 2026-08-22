@@ -2,11 +2,11 @@
 
 import uuid
 
+from app.exports.service import export_service
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import NotFoundException
 from app.core.logging import get_logger
-from app.exports.service import export_service
 from app.models.entities import Evaluation, Topic
 from app.reporting.calculator import calculate_assessment_report
 from app.reporting.schemas import (
