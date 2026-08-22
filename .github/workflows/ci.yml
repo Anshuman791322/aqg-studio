@@ -23,6 +23,7 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
+          cache-dependency-path: backend/requirements.txt
 
       - name: Install backend dependencies
         run: |
@@ -30,13 +31,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Ruff Lint Check
-        run: ruff check .
+        run: python -m ruff check .
 
       - name: Run mypy Strict Type Check
-        run: mypy app
+        run: python -m mypy app
 
       - name: Run Pytest Test Suite
-        run: pytest -v tests/
+        run: python -m pytest -v tests/
         env:
           PYTHONPATH: .
           ENVIRONMENT: test
