@@ -1,7 +1,7 @@
 """API endpoints for document upload initiation, completion, processing, knowledge analysis, and chunk retrieval."""
 
 import uuid
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy import select
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.knowledge_agent import KnowledgeAnalysisAgent
 from app.core.auth import CurrentUser, get_current_user
+from app.core.config import get_settings
 from app.core.errors import NotFoundException, ValidationException
 from app.db.session import get_db
 from app.knowledge.schemas import (
@@ -19,8 +20,11 @@ from app.knowledge.schemas import (
     TopicSchema,
 )
 from app.models.entities import Concept, LearningObjective, Topic
+from app.orchestration.runner import job_runner
+from app.orchestration.schemas import JobStatusResponse
 from app.repositories.chunk import chunk_repo
 from app.repositories.document import document_repo
+from app.repositories.job import job_repo
 from app.retrieval.schemas import RetrievalRequest, RetrievalResponse
 from app.retrieval.service import HybridRetrievalService
 from app.schemas.common import SuccessResponse
@@ -31,7 +35,9 @@ from app.schemas.document import (
     DocumentResponseData,
 )
 from app.services.document_processor import document_processor
+from app.services.storage import delete_file_from_storage
 
+settings = get_settings()
 router = APIRouter()
 knowledge_agent = KnowledgeAnalysisAgent()
 retrieval_service = HybridRetrievalService()
@@ -84,34 +90,130 @@ async def complete_document_upload(
     return SuccessResponse(data=DocumentResponseData.model_validate(doc))
 
 
-@router.post("/{document_id}/process", response_model=SuccessResponse[DocumentResponseData])
+@router.post("/{document_id}/process", response_model=SuccessResponse[JobStatusResponse])
 async def process_document(
     document_id: uuid.UUID,
-    file: UploadFile = File(...),
+    file: UploadFile | None = File(None),
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession | None = Depends(get_db),
-) -> SuccessResponse[DocumentResponseData]:
-    """Process document file bytes, extract text, and generate structured chunks."""
-    content_bytes = await file.read()
-    if not content_bytes:
-        raise ValidationException(
-            message="Uploaded file content is empty.",
-            code="EMPTY_FILE",
+) -> SuccessResponse[JobStatusResponse]:
+    """Enqueue an asynchronous PostgreSQL background job for document parsing, chunking, embeddings, and analysis."""
+    if db is None:
+        raise ValidationException(message="Database is not available.", code="DATABASE_UNAVAILABLE")
+
+    doc = await document_repo.get_by_id(db, id=document_id, user_id=current_user.user_id)
+    if not doc:
+        raise NotFoundException(
+            message=f"Document '{document_id}' not found.",
+            code="DOCUMENT_NOT_FOUND",
         )
 
-    filename = file.filename or "uploaded_document"
-    mime_type = file.content_type
+    initial_state: dict[str, Any] = {
+        "document_id": str(document_id),
+        "user_id": str(current_user.user_id),
+        "filename": doc.original_filename,
+        "storage_path": doc.storage_path,
+        "mime_type": doc.mime_type,
+    }
 
-    doc = await document_processor.process_document_bytes(
-        db=db,
+    if file is not None:
+        content_bytes = await file.read()
+        if content_bytes:
+            initial_state["raw_bytes"] = content_bytes
+            initial_state["filename"] = file.filename or doc.original_filename
+            initial_state["mime_type"] = file.content_type or doc.mime_type
+
+    job = await job_runner.enqueue_job(
+        db,
         user_id=current_user.user_id,
-        document_id=document_id,
-        raw_bytes=content_bytes,
-        filename=filename,
-        mime_type=mime_type,
+        resource_type="document",
+        resource_id=document_id,
+        job_type="document_processing",
+        initial_state=initial_state,
     )
 
-    return SuccessResponse(data=DocumentResponseData.model_validate(doc))
+    data = JobStatusResponse(
+        job_id=job.id,
+        resource_type=job.resource_type,
+        resource_id=job.resource_id,
+        job_type=job.job_type,
+        status=job.status,
+        progress=float(job.progress),
+        current_step=job.current_step,
+        error_code=job.error_code,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        locked_at=job.locked_at,
+        heartbeat_at=job.heartbeat_at,
+        state=dict(job.state or {}),
+    )
+    return SuccessResponse(data=data)
+
+
+@router.get("/{document_id}/status", response_model=SuccessResponse[JobStatusResponse])
+async def get_document_status(
+    document_id: uuid.UUID,
+    current_user: CurrentUser = Depends(get_current_user),
+    db: AsyncSession | None = Depends(get_db),
+) -> SuccessResponse[JobStatusResponse]:
+    """Retrieve background processing status, progress percentage, and current step for a document."""
+    if db is None:
+        raise ValidationException(message="Database is not available.", code="DATABASE_UNAVAILABLE")
+
+    doc = await document_repo.get_by_id(db, id=document_id, user_id=current_user.user_id)
+    if not doc:
+        raise NotFoundException(
+            message=f"Document '{document_id}' not found.",
+            code="DOCUMENT_NOT_FOUND",
+        )
+
+    # Find active or most recent job
+    job = await job_repo.get_active_job(
+        db,
+        resource_type="document",
+        resource_id=document_id,
+        user_id=current_user.user_id,
+    )
+    if not job:
+        history = await job_repo.list_by_resource(
+            db, resource_id=document_id, user_id=current_user.user_id
+        )
+        job = history[0] if history else None
+
+    if not job:
+        # Generate synthetic status reflecting document table state
+        data = JobStatusResponse(
+            job_id=uuid.uuid4(),
+            resource_type="document",
+            resource_id=document_id,
+            job_type="document_processing",
+            status="completed" if doc.status == "ready" else doc.status,
+            progress=100.0 if doc.status == "ready" else 0.0,
+            current_step="finalize_document" if doc.status == "ready" else None,
+            created_at=doc.created_at,
+            updated_at=doc.updated_at,
+        )
+        return SuccessResponse(data=data)
+
+    data = JobStatusResponse(
+        job_id=job.id,
+        resource_type=job.resource_type,
+        resource_id=job.resource_id,
+        job_type=job.job_type,
+        status=job.status,
+        progress=float(job.progress),
+        current_step=job.current_step,
+        error_code=job.error_code,
+        error_message=job.error_message,
+        created_at=job.created_at,
+        updated_at=job.updated_at,
+        locked_at=job.locked_at,
+        heartbeat_at=job.heartbeat_at,
+        state=dict(job.state or {}),
+    )
+    return SuccessResponse(data=data)
+
 
 
 @router.get("", response_model=SuccessResponse[list[DocumentResponseData]])
@@ -164,9 +266,23 @@ async def delete_document(
     current_user: CurrentUser = Depends(get_current_user),
     db: AsyncSession | None = Depends(get_db),
 ) -> SuccessResponse[dict[str, bool]]:
-    """Delete a document and all associated chunks."""
+    """Delete a document, purge associated chunks, and remove remote storage objects."""
     if db is None:
         return SuccessResponse(data={"deleted": True})
+
+    doc = await document_repo.get_by_id(db, id=document_id, user_id=current_user.user_id)
+    if not doc:
+        raise NotFoundException(
+            message=f"Document '{document_id}' not found.",
+            code="DOCUMENT_NOT_FOUND",
+        )
+
+    # Clean up remote Supabase Storage object
+    if doc.storage_path:
+        await delete_file_from_storage(
+            bucket=settings.SUPABASE_STORAGE_BUCKET_DOCUMENTS,
+            path=doc.storage_path,
+        )
 
     deleted = await document_repo.delete(db, id=document_id, user_id=current_user.user_id)
     if not deleted:

@@ -1,8 +1,9 @@
-"""Structured logging configuration with correlation ID tracking."""
+"""Structured logging configuration with correlation ID tracking and secret redaction."""
 
 import contextvars
 import json
 import logging
+import re
 import sys
 from datetime import UTC, datetime
 from typing import Any
@@ -12,19 +13,41 @@ correlation_id_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "correlation_id", default=None
 )
 
+# Regex patterns to sanitize sensitive credentials from logs
+SECRET_PATTERNS = [
+    re.compile(r"Bearer\s+([a-zA-Z0-9_\-\.]{10,})", re.IGNORECASE),
+    re.compile(r"(sk-[a-zA-Z0-9_\-]{20,})", re.IGNORECASE),
+    re.compile(r"(nvapi-[a-zA-Z0-9_\-]{20,})", re.IGNORECASE),
+    re.compile(r"(['\"]?password['\"]?\s*[:=]\s*['\"])([^'\"]+)(['\"])", re.IGNORECASE),
+    re.compile(r"(['\"]?apiKey['\"]?\s*[:=]\s*['\"])([^'\"]+)(['\"])", re.IGNORECASE),
+]
+
+
+def redact_secrets(text: str) -> str:
+    """Sanitize tokens, API keys, and passwords from log strings."""
+    if not text:
+        return text
+    sanitized = text
+    for pattern in SECRET_PATTERNS:
+        sanitized = pattern.sub("[REDACTED]", sanitized)
+    return sanitized
+
 
 class StructuredJsonFormatter(logging.Formatter):
-    """Custom JSON formatter injecting correlation_id, timestamp, and context."""
+    """Custom JSON formatter injecting correlation_id, timestamp, and sanitized context."""
 
     def format(self, record: logging.LogRecord) -> str:
         timestamp = datetime.fromtimestamp(record.created, tz=UTC).isoformat()
         correlation_id = correlation_id_ctx.get()
 
+        raw_message = record.getMessage()
+        sanitized_message = redact_secrets(raw_message)
+
         log_data: dict[str, Any] = {
             "timestamp": timestamp,
             "level": record.levelname,
             "logger": record.name,
-            "message": record.getMessage(),
+            "message": sanitized_message,
             "module": record.module,
             "line": record.lineno,
         }
@@ -38,20 +61,31 @@ class StructuredJsonFormatter(logging.Formatter):
         # Include custom extra fields if present
         extra_data = getattr(record, "extra", None)
         if isinstance(extra_data, dict):
-            log_data.update(extra_data)
+            # Redact string values in extra data dictionary
+            safe_extra = {
+                k: redact_secrets(str(v)) if isinstance(v, str) else v
+                for k, v in extra_data.items()
+            }
+            log_data.update(safe_extra)
 
         return json.dumps(log_data)
 
 
 class CorrelationIdFilter(logging.Filter):
-    """Logging filter to inject correlation ID into standard log records."""
+    """Logging filter to inject correlation ID and sanitize log records."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.correlation_id = correlation_id_ctx.get() or "-"
+        if isinstance(record.msg, str):
+            record.msg = redact_secrets(record.msg)
         return True
 
 
-def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
+def setup_logging(
+    log_level: str = "INFO",
+    json_format: bool | None = None,
+    environment: str = "development",
+) -> None:
     """Configure root and application loggers."""
     numeric_level = getattr(logging, log_level.upper(), logging.INFO)
 
@@ -65,7 +99,13 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     stream_handler = logging.StreamHandler(sys.stdout)
     stream_handler.setLevel(numeric_level)
 
-    if json_format:
+    use_json = (
+        json_format
+        if json_format is not None
+        else environment.lower() in ("production", "staging")
+    )
+
+    if use_json:
         stream_handler.setFormatter(StructuredJsonFormatter())
     else:
         log_format = "%(asctime)s [%(levelname)s] [req:%(correlation_id)s] %(name)s: %(message)s"
@@ -78,6 +118,7 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     # Silence overly verbose external loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> logging.Logger:

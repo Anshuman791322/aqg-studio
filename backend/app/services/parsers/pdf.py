@@ -16,6 +16,13 @@ class PDFDocumentParser(BaseDocumentParser):
     """PyMuPDF-based parser extracting structured text, sections, and page metadata."""
 
     def parse(self, content_bytes: bytes, filename: str) -> ParsedDocument:
+        # Validate PDF signature / magic bytes
+        if not content_bytes.startswith(b"%PDF-"):
+            return ParsedDocument(
+                error_code="INVALID_FILE_SIGNATURE",
+                error_message="The uploaded file does not contain a valid PDF binary signature.",
+            )
+
         try:
             doc = fitz.open(stream=content_bytes, filetype="pdf")
         except Exception as e:

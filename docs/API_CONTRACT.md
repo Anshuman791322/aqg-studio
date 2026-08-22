@@ -95,7 +95,8 @@
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/documents/initiate` | Validate format/size and obtain target private Storage path (`<user_id>/<doc_id>/<sanitized_filename>`) | Authenticated |
 | `POST` | `/api/v1/documents/{document_id}/complete` | Confirm direct client upload to private `source-documents` bucket | Authenticated |
-| `POST` | `/api/v1/documents/{document_id}/process` | Deterministically parse document bytes, extract sections & hierarchical chunks | Authenticated |
+| `POST` | `/api/v1/documents/{document_id}/process` | Enqueue asynchronous 7-node LangGraph document processing job | Authenticated |
+| `GET` | `/api/v1/documents/{document_id}/status` | Poll execution progress, current step, and error state for document job | Authenticated |
 | `GET` | `/api/v1/documents` | List uploaded documents with pagination (`limit`, `offset`) | Authenticated |
 | `GET` | `/api/v1/documents/{document_id}` | Get document metadata, parsing status, word count & page count | Authenticated |
 | `GET` | `/api/v1/documents/{document_id}/chunks` | List extracted structured chunks (600–900 tokens, 10% overlap) | Authenticated |
@@ -110,17 +111,29 @@
 }
 ```
 
-#### Response Example:
+#### Response Example: `POST /api/v1/documents/{document_id}/process`
 ```json
 {
   "success": true,
   "data": {
-    "document_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "storage_path": "3fa85f64-5717-4562-b3fc-2c963f66afa6/3fa85f64-5717-4562-b3fc-2c963f66afa6/Calculus_Chapter_1.pdf",
-    "upload_bucket": "source-documents"
+    "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "resource_type": "document",
+    "resource_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "job_type": "document_processing",
+    "status": "queued",
+    "progress": 0.0,
+    "current_step": "validate_document",
+    "accepted_questions": null,
+    "target_questions": null,
+    "attempts": 0,
+    "max_attempts": 3,
+    "error_code": null,
+    "error_message": null,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T10:00:00Z"
   },
   "meta": {
-    "timestamp": "2026-08-21T11:00:00Z",
+    "timestamp": "2026-08-22T10:00:00Z",
     "request_id": "req_01j6f93abcde12345"
   }
 }
@@ -144,11 +157,40 @@
 | `GET` | `/api/v1/assessments` | List all assessments for authenticated user | Authenticated |
 | `GET` | `/api/v1/assessments/{assessment_id}` | Retrieve details for a specific assessment | Authenticated |
 | `GET` | `/api/v1/assessments/{assessment_id}/blueprint` | Retrieve question blueprints in sequence order | Authenticated |
-| `POST` | `/api/v1/assessments/{assessment_id}/generate` | Trigger grounded batch question generation | Authenticated |
+| `POST` | `/api/v1/assessments/{assessment_id}/generate` | Enqueue asynchronous 10-node LangGraph assessment generation job | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}/status` | Poll execution progress, current step, accepted questions & quota | Authenticated |
+| `POST` | `/api/v1/assessments/{assessment_id}/cancel` | Abort active running or queued generation job | Authenticated |
+| `POST` | `/api/v1/assessments/{assessment_id}/evaluate` | Trigger automated evaluation, refinement loops & dedup | Authenticated |
 | `GET` | `/api/v1/assessments/{assessment_id}/questions` | List generated questions with evidence and citations | Authenticated |
 | `DELETE` | `/api/v1/assessments/{assessment_id}` | Delete assessment and associated blueprints/questions | Authenticated |
 
-
+#### Response Example: `GET /api/v1/assessments/{assessment_id}/status`
+```json
+{
+  "success": true,
+  "data": {
+    "job_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "resource_type": "assessment",
+    "resource_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "job_type": "question_generation",
+    "status": "running",
+    "progress": 65.0,
+    "current_step": "evaluate_batches",
+    "accepted_questions": 4,
+    "target_questions": 5,
+    "attempts": 1,
+    "max_attempts": 3,
+    "error_code": null,
+    "error_message": null,
+    "created_at": "2026-08-22T10:00:00Z",
+    "updated_at": "2026-08-22T10:02:15Z"
+  },
+  "meta": {
+    "timestamp": "2026-08-22T10:02:15Z",
+    "request_id": "req_01j6f93abcde12345"
+  }
+}
+```
 
 ---
 
@@ -168,12 +210,18 @@
 | `GET` | `/api/v1/assessments/{assessment_id}/questions` | List questions with evaluation scores & citations | Authenticated |
 | `GET` | `/api/v1/questions/{question_id}` | Retrieve individual question with full audit trace | Authenticated |
 | `PATCH`| `/api/v1/questions/{question_id}` | Update stem, options, key, explanation or status | Authenticated |
-| `POST` | `/api/v1/questions/{question_id}/refine` | Request single-item AI regeneration pass | Authenticated |
+| `POST` | `/api/v1/questions/{question_id}/evaluate` | Trigger automated pedagogical evaluation scorecard | Authenticated |
+| `POST` | `/api/v1/questions/{question_id}/refine` | Request single-item targeted refinement pass | Authenticated |
+| `GET` | `/api/v1/questions/{question_id}/evaluations` | List historical evaluation scorecards for question | Authenticated |
 
 ---
 
-### 2.7 Multi-Format Export Center
+### 2.7 Multi-Format Export Center & Assessment Reporting
 | Method | Path | Description | Access |
 | :--- | :--- | :--- | :--- |
-| `POST` | `/api/v1/exports` | Request asynchronous assessment export generation | Authenticated |
-| `GET` | `/api/v1/exports/{export_id}` | Check export status & retrieve signed download URL | Authenticated |
+| `POST` | `/api/v1/assessments/{assessment_id}/exports` | Create and compile an assessment export package (PDF, DOCX, JSON, CSV) | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}/exports` | List all compiled export packages for an assessment | Authenticated |
+| `GET` | `/api/v1/exports/{export_id}/download` | Download export binary payload securely with ownership check | Authenticated |
+| `DELETE`| `/api/v1/exports/{export_id}` | Delete export package and clean up storage | Authenticated |
+| `GET` | `/api/v1/assessments/{assessment_id}/report` | Retrieve deterministic pedagogical quality metrics and distribution analysis | Authenticated |
+

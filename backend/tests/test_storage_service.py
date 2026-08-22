@@ -66,3 +66,45 @@ def test_validate_storage_path_rejects_path_traversal() -> None:
     assert validate_storage_path(f"{user_id}/../other_user/data.pdf", user_id) is False
     assert validate_storage_path(f"{user_id}/..\\data.pdf", user_id) is False
     assert validate_storage_path("", user_id) is False
+
+
+async def test_supabase_storage_rest_operations_mocked() -> None:
+    """Verify upload, download, delete, and sign URL storage methods with mock HTTP responses."""
+    from unittest.mock import AsyncMock, patch
+
+    from app.services.storage import (
+        create_signed_download_url,
+        delete_file_from_storage,
+        download_file_from_storage,
+        upload_file_to_storage,
+    )
+
+    with (
+        patch("app.services.storage.get_storage_base_url", return_value="https://test.supabase.co/storage/v1"),
+        patch("app.services.storage.get_storage_headers", return_value={"Authorization": "Bearer mock"}),
+    ):
+        mock_upload_resp = AsyncMock(status_code=200)
+        mock_download_resp = AsyncMock(status_code=200, content=b"mock-binary-data")
+        mock_delete_resp = AsyncMock(status_code=200)
+        mock_sign_resp = AsyncMock(status_code=200, json=lambda: {"signedURL": "/object/sign/url123"})
+
+        with patch("httpx.AsyncClient.post", side_effect=[mock_upload_resp, mock_sign_resp]), \
+             patch("httpx.AsyncClient.get", return_value=mock_download_resp), \
+             patch("httpx.AsyncClient.request", return_value=mock_delete_resp):
+
+            # 1. Test upload
+            uploaded = await upload_file_to_storage("generated-exports", "user/ass/exp.pdf", b"data")
+            assert uploaded is True
+
+            # 2. Test download
+            downloaded = await download_file_from_storage("generated-exports", "user/ass/exp.pdf")
+            assert downloaded == b"mock-binary-data"
+
+            # 3. Test signed URL
+            signed_url = await create_signed_download_url("generated-exports", "user/ass/exp.pdf")
+            assert signed_url == "https://test.supabase.co/storage/v1/object/sign/url123"
+
+            # 4. Test delete
+            deleted = await delete_file_from_storage("generated-exports", "user/ass/exp.pdf")
+            assert deleted is True
+

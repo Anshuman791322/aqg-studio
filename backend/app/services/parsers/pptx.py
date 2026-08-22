@@ -17,14 +17,34 @@ class PPTXDocumentParser(BaseDocumentParser):
     """Parser extracting text, slide titles, and speaker notes from PPTX presentations."""
 
     def parse(self, content_bytes: bytes, filename: str) -> ParsedDocument:
-        # Check zip archive validity
+        # Validate PK zip signature
+        if not content_bytes.startswith(b"PK"):
+            return ParsedDocument(
+                error_code="INVALID_FILE_SIGNATURE",
+                error_message="The uploaded file does not contain a valid PPTX archive signature.",
+            )
+
+        # Protect against zip bombs / excessive entries / corrupted archives
         try:
             with zipfile.ZipFile(io.BytesIO(content_bytes)) as zf:
-                total_uncompressed = sum(info.file_size for info in zf.infolist())
+                entries = zf.infolist()
+                if len(entries) > 1000:
+                    return ParsedDocument(
+                        error_code="ZIP_BOMB_DETECTED",
+                        error_message="Presentation archive contains too many files.",
+                    )
+
+                total_uncompressed = sum(info.file_size for info in entries)
                 if total_uncompressed > 200 * 1024 * 1024:
                     return ParsedDocument(
                         error_code="ZIP_BOMB_DETECTED",
                         error_message="Presentation exceeds uncompressed security size limits.",
+                    )
+
+                if total_uncompressed / max(len(content_bytes), 1) > 100:  # 100:1 ratio limit
+                    return ParsedDocument(
+                        error_code="ZIP_BOMB_DETECTED",
+                        error_message="Presentation exceeds maximum safe compression ratio.",
                     )
         except Exception as e:
             return ParsedDocument(

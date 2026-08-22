@@ -18,11 +18,17 @@ from app.api.v1.router import api_v1_router
 from app.core.config import get_settings
 from app.core.errors import AppException, ErrorDetail, ErrorPayload, ErrorResponse, MetaPayload
 from app.core.logging import correlation_id_ctx, get_logger, setup_logging
+from app.core.quota import burst_rate_limiter
 from app.db.session import check_db_health, get_engine
+from app.orchestration.runner import job_runner
 from app.schemas.common import HealthLiveResponse, HealthReadyResponse
 
 settings = get_settings()
-setup_logging(log_level=settings.LOG_LEVEL)
+setup_logging(
+    log_level=settings.LOG_LEVEL,
+    json_format=(settings.LOG_FORMAT == "json" if settings.LOG_FORMAT != "auto" else None),
+    environment=settings.ENVIRONMENT,
+)
 logger = get_logger("app.main")
 
 
@@ -35,13 +41,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     db_engine = get_engine()
     if db_engine:
         logger.info("Database engine initialized.")
+        await job_runner.start()
     else:
         logger.info("Database URL not configured; running in standalone mode.")
 
     yield
 
     if db_engine:
-        logger.info("Disposing database engine connection pool...")
+        logger.info("Stopping job runner and disposing database engine connection pool...")
+        await job_runner.stop()
         await db_engine.dispose()
     logger.info("AQG Studio Backend shutdown complete.")
 
@@ -121,7 +129,70 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         return response
 
 
+# ------------------------------------------------------------------------------
+# Security Headers & Rate Limiting Middlewares
+# ------------------------------------------------------------------------------
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Middleware injecting OWASP-recommended security headers."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none';"
+
+        if settings.ENVIRONMENT.lower() in ("production", "staging"):
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+        return response
+
+
+class BurstRateLimiterMiddleware(BaseHTTPMiddleware):
+    """Middleware applying in-memory burst rate limiting per client identifier."""
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        # Exempt health probes from rate limiting
+        if request.url.path in ("/health/live", "/health/ready"):
+            return await call_next(request)
+
+        # Derive client identifier from Authorization Bearer hash or client IP
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            client_key = f"auth_{auth_header[-16:]}"
+        else:
+            forwarded = request.headers.get("X-Forwarded-For")
+            client_ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "anonymous")
+            client_key = f"ip_{client_ip}"
+
+        allowed, retry_after, remaining = burst_rate_limiter.is_allowed(client_key)
+        if not allowed:
+            req_id = getattr(request.state, "correlation_id", None)
+            resp = _create_error_response(
+                code="RATE_LIMIT_EXCEEDED",
+                message=f"Too many requests. Please slow down and try again in {retry_after} seconds.",
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                details=[{"retry_after_seconds": retry_after}],
+                correlation_id=req_id,
+            )
+            resp.headers["Retry-After"] = str(retry_after)
+            return resp
+
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(settings.BURST_RATE_LIMIT_PER_MINUTE)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        return response
+
+
 app.add_middleware(CorrelationIdMiddleware)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BurstRateLimiterMiddleware)
 
 # ------------------------------------------------------------------------------
 # CORS Middleware (Configured Strictly from Environment)
@@ -132,7 +203,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    expose_headers=["X-Correlation-ID"],
+    expose_headers=["X-Correlation-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"],
 )
 
 

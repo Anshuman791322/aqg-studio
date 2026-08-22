@@ -4,12 +4,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import CurrentUser, get_current_user
+from app.core.logging import get_logger
 from app.db.session import get_db
 from app.repositories.profile import profile_repo
 from app.repositories.usage import usage_repo
 from app.schemas.auth import UserProfileData, UserQuotaSummary
 from app.schemas.common import SuccessResponse
 
+logger = get_logger("app.api.v1.endpoints.auth")
 router = APIRouter()
 
 
@@ -36,9 +38,10 @@ async def get_my_profile(
                 today_output_tokens=usage.output_tokens,
                 today_assessments=usage.assessments_created,
             )
-        except Exception:
-            # Fallback gracefully if database is undergoing migration or read replica lag
-            pass
+        except Exception as exc:
+            logger.warning(
+                f"Graceful fallback: failed to fetch profile/usage for user '{current_user.user_id}': {exc}"
+            )
 
     profile_data = UserProfileData(
         user_id=current_user.user_id,

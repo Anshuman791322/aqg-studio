@@ -579,7 +579,7 @@ class Evaluation(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "decision IN ('PASS', 'REVISE', 'FAIL')",
+            "decision IN ('PASS', 'REVISE', 'FAIL', 'ACCEPT', 'REFINE', 'REGENERATE')",
             name="ck_evaluations_decision",
         ),
     )
@@ -638,7 +638,7 @@ class Job(Base):
         CheckConstraint(
             "job_type IN ('document_processing', 'knowledge_analysis', "
             "'question_planning', 'question_generation', 'question_evaluation', "
-            "'export_generation')",
+            "'assessment_generation', 'export_generation')",
             name="ck_jobs_job_type",
         ),
         CheckConstraint(

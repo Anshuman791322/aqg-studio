@@ -78,7 +78,44 @@ AQG Studio enforces defense-in-depth across database, storage, authentication, a
 
 ---
 
-## 5. Threat Model & Mitigations
+## 6. Archive Decompression & Zip Bomb Defenses (Phase 13)
+
+To protect backend workers from zip bombs and corrupted office archives (DOCX, PPTX), all parsers implement triple-layer decompression checks before parsing:
+1. **Magic Byte Signature Verification**: Pre-checks binary headers (`%PDF-` for PDF, `PK\x03\x04` for DOCX/PPTX).
+2. **Archive Entry Count Cap**: Rejects archives containing more than 1,000 internal entries (`ZIP_BOMB_DETECTED`).
+3. **Uncompressed Size Cap**: Rejects archives expanding to more than 200MB uncompressed (`ZIP_BOMB_DETECTED`).
+4. **Compression Ratio Cap**: Rejects archives with expansion ratios exceeding 100:1 (`ZIP_BOMB_DETECTED`).
+
+---
+
+## 7. Burst Rate Limiting & Atomic Quotas without Redis (Phase 13)
+
+1. **In-Memory Sliding-Window Burst Rate Limiter**:
+   - Per-process in-memory limiter tracking 120 requests/minute per client identifier (`ip_{client_ip}` or `auth_{token_hash}`).
+   - Returns `429 Too Many Requests` with standard `Retry-After: {seconds}` header and correlation ID envelope.
+   - Probes to `/health/live` and `/health/ready` are exempt from rate limiting to protect orchestrator liveness checks.
+2. **PostgreSQL-Backed Daily Atomic Quotas**:
+   - `MAX_ASSESSMENTS_PER_DAY` (Default: 10/day per user).
+   - `MAX_QUESTIONS_PER_ASSESSMENT` (Default: 50/assessment).
+   - `MAX_LLM_CALLS_PER_ASSESSMENT` (Default: 30/assessment).
+   - Atomic check-and-increment on `llm_usage_daily` table prevents race conditions without requiring Redis.
+
+---
+
+## 8. OWASP Security Headers & Production Hardening (Phase 13)
+
+The backend injects standard OWASP defense headers on all HTTP responses:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: geolocation=(), camera=(), microphone=()`
+- `Content-Security-Policy: default-src 'self'; frame-ancestors 'none';`
+- `Strict-Transport-Security: max-age=31536000; includeSubDomains` (enforced in production & staging)
+
+---
+
+## 9. Threat Model & Mitigations Summary
 
 | Threat | Impact | Mitigation |
 | :--- | :--- | :--- |
@@ -87,5 +124,9 @@ AQG Studio enforces defense-in-depth across database, storage, authentication, a
 | **Request Body User ID Spoofing** | Attacker creating resources under victim account | Repository methods unconditionally force `CurrentUser.user_id` from verified token |
 | **Cross-Tenant Document Access** | Unauthorized reading of proprietary educational content | Storage RLS + Database table RLS + Repository user-scoping on all backend queries |
 | **Path Traversal File Overwrite** | Malicious upload overwriting system files | `sanitize_filename` strips `..` and special characters; path generated deterministically as `{user_id}/{doc_id}/{filename}` |
-| **LLM Key Exposure** | Upstream account compromise / unauthorized usage | Keys restricted to server-side env vars only; never referenced in frontend or logs |
-| **LLM Token Exhaustion / DoS** | Free-tier token exhaustion across users | Per-user rate-limiting and application request budget in `FallbackLLMGateway` |
+| **Zip Bomb / Decompression Bomb** | Server disk/RAM exhaustion from malicious archives | Entry count limit (1,000), size cap (200MB), and ratio cap (100:1) enforced before parsing |
+| **API Burst Flooding** | Resource starvation / thread exhaustion | In-memory sliding window rate limiter (120 req/min) returning 429 and `Retry-After` |
+| **Daily Quota Abuse** | Upstream token budget exhaustion | Atomic PostgreSQL daily assessment limits (10/day) and question caps (50/assessment) |
+| **LLM Key Exposure** | Upstream account compromise / unauthorized usage | Keys restricted to server-side env vars only; regex secret redaction in all loggers |
+| **Prompt Injection in Source Docs** | Hijacking AI reasoning or leaking system prompts | Document content wrapped in untrusted boundary tags `<document_content>` with strict security mandates |
+

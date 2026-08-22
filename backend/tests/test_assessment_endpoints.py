@@ -194,7 +194,8 @@ def test_create_assessment_endpoint_success() -> None:
         "bloom_distribution": {"apply": 100},
     }
 
-    response = client.post("/api/v1/assessments", headers=headers, json=payload)
+    with patch("app.core.quota.quota_service.check_and_increment_assessment_quota", AsyncMock()):
+        response = client.post("/api/v1/assessments", headers=headers, json=payload)
 
     assert response.status_code == 201
     body = response.json()
@@ -312,9 +313,15 @@ def test_get_blueprint_and_delete_assessment() -> None:
         )
 
     # 2. Test Delete
-    with patch(
-        "app.repositories.assessment.assessment_repo.delete",
-        AsyncMock(return_value=True),
+    with (
+        patch(
+            "app.repositories.assessment.assessment_repo.delete",
+            AsyncMock(return_value=True),
+        ),
+        patch(
+            "app.repositories.export.export_repo.list_by_assessment",
+            AsyncMock(return_value=[]),
+        ),
     ):
         res_del = client.delete(f"/api/v1/assessments/{assessment_id}", headers=headers)
         assert res_del.status_code == 200

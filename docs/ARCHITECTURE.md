@@ -128,14 +128,16 @@ The multi-agent workflow is modeled as a LangGraph `StateGraph` passing a typed 
 - **Output**: Draft `GeneratedQuestion` records with full provenance links.
 
 ### Agent 5: Evaluation & Refinement Agent
-- **Purpose**: Implements an adversarial critique loop. Evaluates every drafted question across 5 dimensions:
-  1. *Factual Groundedness* (checks against retrieved chunks; flags unsupported claims).
-  2. *Stem Clarity* (identifies ambiguity or grammatical issues).
-  3. *Distractor Plausibility* (ensures options are realistic and mutually exclusive).
-  4. *Bloom Alignment* (verifies cognitive verbs match question task).
-  5. *Fairness & Tone* (screens for unwanted bias).
-- **Refinement Loop**: If a question scores < 4.0/5.0 aggregate or fails groundedness, the agent crafts targeted feedback annotations and routes the item back to Agent 4 for a regenerative pass (capped at 2 iterations).
-- **Output**: Verified questions and comprehensive `QuestionEvaluationReport`.
+- **Purpose**: Implements an automated adversarial critique, scoring, and refinement loop.
+- **Deterministic Validation**: Fast non-LLM checks for required fields, character bounds, source chunk ID provenance against document chunks, single-select MCQ rules (4 options, unique keys/texts, single correct answer, ban on lazy phrases), boolean formats, and exact normalized duplicate prevention.
+- **Pedagogical Evaluation**: Evaluates candidate questions across 10 dimensions (correctness, groundedness, relevance, clarity, grammar, answerability, difficulty alignment, Bloom alignment, distractor quality, duplication risk, overall quality).
+- **Decision Engine**:
+  - `ACCEPT`: high quality scores (overall >= 0.85, correctness >= 0.90, groundedness >= 0.90, duplication_risk <= 0.30) and zero critical flaws.
+  - `REFINE`: recoverable flaws (minor stem ambiguity, distractor tweak, grammar polish) routed to LLM Refinement Prompt preserving source boundaries.
+  - `REGENERATE`: fatal flaws, ungrounded claims, or hallucinated facts routed to fresh item generation.
+- **Attempt Bounding & Replacement Blueprints**: Refinement and regeneration passes are bounded (`EVALUATION_MAX_REFINEMENT_ATTEMPTS = 2`, `EVALUATION_MAX_REGENERATION_ATTEMPTS = 2`). If attempts exhaust, replacement blueprints are deterministically generated to maintain the requested question quota.
+- **Duplicate Control**: Exact normalized matching, lexical Jaccard similarity, and vector cosine embedding similarity identify peer duplicates and keep higher-quality candidates.
+- **Output**: Fully verified questions, persisted `Evaluation` scorecards, and `AssessmentEvaluationSummary`.
 
 ### Agent 6: Output & Report Agent
 - **Purpose**: Computes global assessment statistics, calculates overall quality scores, estimates assessment completion time, flags human-review recommendations, and compiles export packages.
@@ -144,44 +146,88 @@ The multi-agent workflow is modeled as a LangGraph `StateGraph` passing a typed 
 
 ---
 
-## 4. LangGraph State Management
+## 4. LangGraph State Management & PostgreSQL Background Job Runner
 
-The core generation pipeline maintains an immutable state across all 6 agent nodes:
+To operate reliably on Render free-tier instances (which may sleep, cycle, or restart), all long-running asynchronous workflows are managed as compiled **LangGraph** state graphs executed by an in-process **PostgreSQL-backed Job Runner** (`PostgresJobRunner`).
+
+### 4.1 Compact Typed Graph States
+
+State dictionaries store lightweight identifiers, bounds, step pointers, and metric counters rather than large raw texts or embedding arrays:
 
 ```python
-from typing import TypedDict, List, Dict, Any, Optional
-
-class AssessmentJobState(TypedDict):
-    job_id: str
-    user_id: str
+class DocumentGraphState(TypedDict, total=False):
     document_id: str
-    raw_file_path: str
-    file_type: str
-    
-    # Agent 1 Outputs
-    total_pages: int
-    is_scanned_pdf: bool
-    chunks: List[Dict[str, Any]]
-    
-    # Agent 2 Outputs
-    knowledge_map: Dict[str, Any]
-    extracted_topics: List[str]
-    
-    # Agent 3 Outputs
-    blueprint_id: str
-    question_plans: List[Dict[str, Any]]
-    
-    # Agent 4 & 5 Outputs
-    draft_questions: List[Dict[str, Any]]
-    evaluated_questions: List[Dict[str, Any]]
-    refinement_iterations: Dict[str, int]
-    
-    # Agent 6 Outputs
-    final_scorecard: Dict[str, Any]
-    export_manifest: Dict[str, Any]
-    status: str
-    error: Optional[str]
+    user_id: str
+    raw_bytes: bytes | None
+    storage_path: str | None
+    mime_type: str | None
+    page_count: int
+    word_count: int
+    language: str
+    chunk_ids: list[str]
+    topic_ids: list[str]
+    current_step: str
+    progress: float
+    error_code: str | None
+    error_message: str | None
+
+class AssessmentGraphState(TypedDict, total=False):
+    assessment_id: str
+    document_id: str
+    user_id: str
+    target_questions: int
+    blueprint_ids: list[str]
+    generated_question_ids: list[str]
+    accepted_question_ids: list[str]
+    failed_question_ids: list[str]
+    replacement_blueprint_ids: list[str]
+    replacement_count: int
+    current_step: str
+    progress: float
+    average_quality_score: float
+    error_code: str | None
+    error_message: str | None
 ```
+
+### 4.2 Compiled Workflows
+
+1. **Document Processing Workflow (7 Nodes)**:
+   ```
+   START
+   ──► validate_document
+   ──► extract_document
+   ──► clean_and_chunk
+   ──► store_chunks
+   ──► create_embeddings
+   ──► analyze_knowledge
+   ──► finalize_document
+   ──► END
+   ```
+
+2. **Assessment Generation & Refinement Workflow (10 Nodes)**:
+   ```
+   START
+   ──► load_assessment
+   ──► create_or_load_blueprints
+   ──► retrieve_and_generate_batches
+   ──► evaluate_batches
+   ──► route_failed_questions
+   ──► refine_or_regenerate
+   ──► deduplicate
+   ──► verify_requested_count
+   ──► calculate_metrics
+   ──► finalize_assessment
+   ──► END
+   ```
+
+### 4.3 PostgreSQL Job Runner (`PostgresJobRunner`)
+
+- **Brokerless In-Process Architecture**: Pure Python + async SQLAlchemy running inside the FastAPI lifespan without Celery, Redis, Temporal, or external queues.
+- **Transactional Claiming**: Atomically claims the next pending job using `SELECT ... WHERE status = 'queued' ORDER BY created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`, preventing race conditions across concurrent workers.
+- **Heartbeat & Liveness**: Periodically touches `jobs.heartbeat_at` every 15 seconds during graph execution.
+- **Startup Crash Recovery**: On application boot (`job_runner.start()`), detects orphaned running jobs with expired heartbeats and transitions them back to `queued` state with preserved progress checkpoints.
+- **Node Idempotency & Resumability**: Every graph node checks if its respective database entities already exist before performing expensive extraction or LLM invocations, resuming execution from the last persisted checkpoint.
+- **Graceful Shutdown & Cancellation**: Watches an `asyncio.Event` stop signal and checks for active job cancellation before each node execution.
 
 ---
 

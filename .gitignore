@@ -64,6 +64,8 @@ next-env.d.ts
 # Uploads, processing storage & exports (Local runtime files)
 uploads/
 storage/
+storage_exports/
+storage_documents/
 temp/
 exports/
 *.tmp

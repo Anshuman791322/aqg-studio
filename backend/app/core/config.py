@@ -64,6 +64,8 @@ class Settings(BaseSettings):
     SUPABASE_SERVICE_ROLE_KEY: str | None = Field(default=None)
     SUPABASE_JWT_SECRET: str | None = Field(default=None)
     JWT_ALGORITHM: str = Field(default="HS256")
+    SUPABASE_STORAGE_BUCKET_DOCUMENTS: str = Field(default="user-documents")
+    SUPABASE_STORAGE_BUCKET_EXPORTS: str = Field(default="generated-exports")
 
     # LLM Settings & Provider Order
     LLM_PROVIDER_ORDER: str = Field(default="openrouter,nvidia")
@@ -98,6 +100,31 @@ class Settings(BaseSettings):
     GENERATION_MAX_RETRIES: int = Field(default=2)
     GENERATION_RAG_TOP_K: int = Field(default=5)
     GENERATION_MAX_CHUNK_CHARS: int = Field(default=3000)
+
+    # Evaluation & Refinement Agent Settings
+    EVALUATION_ACCEPT_OVERALL_MIN: float = Field(default=0.85)
+    EVALUATION_ACCEPT_CORRECTNESS_MIN: float = Field(default=0.90)
+    EVALUATION_ACCEPT_GROUNDEDNESS_MIN: float = Field(default=0.90)
+    EVALUATION_REFINE_OVERALL_MIN: float = Field(default=0.60)
+    EVALUATION_REFINE_GROUNDEDNESS_MIN: float = Field(default=0.70)
+    EVALUATION_MAX_REFINEMENT_ATTEMPTS: int = Field(default=2)
+    EVALUATION_MAX_REGENERATION_ATTEMPTS: int = Field(default=2)
+    EVALUATION_DUPLICATE_SIMILARITY_THRESHOLD: float = Field(default=0.90)
+    EVALUATION_MAX_REPLACEMENT_BLUEPRINTS: int = Field(default=3)
+    EVALUATION_BATCH_SIZE: int = Field(default=3)
+
+    # Logging & Observability Settings
+    LOG_FORMAT: str = Field(default="auto")  # 'auto', 'json', or 'text'
+
+    # Production Rate Limiting & Quota Limits (Zero Redis Dependency)
+    BURST_RATE_LIMIT_PER_MINUTE: int = Field(default=120)
+    RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60)
+    MAX_ASSESSMENTS_PER_DAY: int = Field(default=10)
+    MAX_QUESTIONS_PER_ASSESSMENT: int = Field(default=50)
+    MAX_LLM_CALLS_PER_ASSESSMENT: int = Field(default=30)
+    MAX_DAILY_LLM_REQUESTS: int = Field(default=1000)
+
+
 
 
 @lru_cache

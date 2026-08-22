@@ -110,13 +110,12 @@ aqg-studio/
 | **06** | **Knowledge Retrieval & RAG** | Vector embeddings, hybrid retrieval, map-and-reduce knowledge analysis | **Completed** |
 | **07** | **Question Planning Agent** | Blueprint generation, Bloom taxonomy matrix, quota planning | **Completed** |
 | **08** | **Question Generation Agent** | Grounded question generation with OpenRouter + NVIDIA fallback| **Completed** |
-| **09** | **Evaluation & Refinement** | 5-metric automated quality grading & iterative revision loop | Ready |
-
-| **10** | **Output & Report Agent** | Quality scorecard, hallucination index, assessment bundler | Planned |
-| **11** | **Human Review Studio** | Interactive UI for editing, approving, and refining items | Planned |
-| **12** | **Multi-Format Export** | Export to PDF, DOCX, Moodle XML, GIFT, QTI 2.1, JSON, CSV | Planned |
-| **13** | **Frontend UI & Dashboard** | Complete Next.js dashboard, upload wizard, live SSE logs | Planned |
-| **14** | **End-to-End Testing & Deploy**| Integration tests, benchmark suite, Vercel & Render staging deploy | Planned |
+| **09** | **Evaluation & Refinement** | 10-metric automated quality grading & iterative revision loop | **Completed** |
+| **10** | **LangGraph Orchestration & Job Runner** | 7-node document & 10-node assessment graph, PostgreSQL job runner | **Completed** |
+| **11** | **AQG Studio Web Interface** | Full Next.js 15 UI, document workspace, assessment studio, review workflow | **Completed** |
+| **12** | **Output & Report Agent & Secure Exports** | Deterministic metrics, PDF, DOCX, JSON, CSV with seeded shuffling | **Completed** |
+| **13** | **Production Hardening & Deployment** | Rate limiting, atomic quotas, OWASP headers, Render & Vercel zero-cost deploy | **Completed** |
+| **14** | **Full Audit & Release Candidate** | 17-dimension audit, full deterministic E2E test, zero lint/type errors, RC documentation | **Completed (RC-1)** |
 
 ---
 
@@ -139,11 +138,14 @@ make install-frontend
 make test-backend
 make test-frontend
 
-# 3. Run linting & strict type checking
+# 3. Run deployment smoke tests (Offline / Zero-cost)
+python scripts/smoke_test.py
+
+# 4. Run linting & strict type checking
 make lint
 make typecheck
 
-# 4. Build production packages
+# 5. Build production packages
 make build
 
 # 5. Start development servers

@@ -10,7 +10,6 @@ from fastapi.testclient import TestClient
 from jose import jwt
 
 from app.db.session import get_db
-from app.generation.schemas import AssessmentGenerationResult, QuestionResponseData
 from app.main import app
 from app.models.entities import (
     Assessment,
@@ -111,35 +110,36 @@ def test_generate_questions_endpoint_success() -> None:
     ]
 
     async def override_get_db():
-        return mock_session
+        yield mock_session
 
     app.dependency_overrides[get_db] = override_get_db
 
-    fake_res = AssessmentGenerationResult(
-        assessment_id=assessment_id,
-        total_blueprints=1,
-        generated_questions=1,
-        failed_blueprints=0,
-        status="ready",
-        questions=[
-            QuestionResponseData(
-                id=uuid.uuid4(),
-                assessment_id=assessment_id,
-                blueprint_id=mock_bp.id,
-                question_type="mcq_single",
-                question_text="Which base pairs with Adenine?",
-                options=[{"key": "A", "text": "Thymine"}],
-                correct_answer="A",
-                explanation="Adenine pairs with Thymine.",
-                difficulty="easy",
-                bloom_level="remember",
-            )
-        ],
-    )
-    with patch(
-        "app.api.v1.endpoints.assessments.generation_agent.generate_assessment_questions",
-        AsyncMock(return_value=fake_res),
+    mock_job = MagicMock()
+    mock_job.id = uuid.uuid4()
+    mock_job.user_id = user_id
+    mock_job.resource_type = "assessment"
+    mock_job.resource_id = assessment_id
+    mock_job.job_type = "question_generation"
+    mock_job.status = "queued"
+    mock_job.progress = 0.0
+    mock_job.current_step = None
+    mock_job.attempts = 0
+    mock_job.max_attempts = 3
+    mock_job.error_code = None
+    mock_job.error_message = None
+    mock_job.state = {}
+    mock_job.created_at = None
+    mock_job.updated_at = None
+
+    with (
+        patch("app.api.v1.endpoints.assessments.assessment_repo.get_by_id", new_callable=AsyncMock) as mock_get_a,
+        patch("app.api.v1.endpoints.assessments.question_repo.list_by_assessment", new_callable=AsyncMock) as mock_list_q,
+        patch("app.api.v1.endpoints.assessments.job_runner.enqueue_job", new_callable=AsyncMock) as mock_enqueue,
     ):
+        mock_get_a.return_value = mock_assessment
+        mock_list_q.return_value = []
+        mock_enqueue.return_value = mock_job
+
         res = client.post(
             f"/api/v1/assessments/{assessment_id}/generate",
             headers=headers,
@@ -148,8 +148,10 @@ def test_generate_questions_endpoint_success() -> None:
     assert res.status_code == 200
     data = res.json()
     assert data["success"] is True
-    assert data["data"]["generated_questions"] == 1
-    assert data["data"]["status"] == "ready"
+    assert data["data"]["resource_id"] == str(assessment_id)
+    assert data["data"]["resource_type"] == "assessment"
+    assert data["data"]["status"] == "queued"
+    assert data["data"]["target_questions"] == 1
 
 
 def test_list_assessment_questions_and_get_single_question() -> None:

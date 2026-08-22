@@ -30,14 +30,34 @@ class DOCXDocumentParser(BaseDocumentParser):
                 ),
             )
 
-        # Protect against zip bombs / corrupted archives
+        # Validate PK zip signature
+        if not content_bytes.startswith(b"PK"):
+            return ParsedDocument(
+                error_code="INVALID_FILE_SIGNATURE",
+                error_message="The uploaded file does not contain a valid DOCX archive signature.",
+            )
+
+        # Protect against zip bombs / excessive archive entries / corrupted archives
         try:
             with zipfile.ZipFile(io.BytesIO(content_bytes)) as zf:
-                total_uncompressed = sum(info.file_size for info in zf.infolist())
+                entries = zf.infolist()
+                if len(entries) > 1000:
+                    return ParsedDocument(
+                        error_code="ZIP_BOMB_DETECTED",
+                        error_message="Document archive contains too many files.",
+                    )
+
+                total_uncompressed = sum(info.file_size for info in entries)
                 if total_uncompressed > 200 * 1024 * 1024:  # 200MB expansion limit
                     return ParsedDocument(
                         error_code="ZIP_BOMB_DETECTED",
                         error_message="Document exceeds uncompressed security size limits.",
+                    )
+
+                if total_uncompressed / max(len(content_bytes), 1) > 100:  # 100:1 ratio limit
+                    return ParsedDocument(
+                        error_code="ZIP_BOMB_DETECTED",
+                        error_message="Document exceeds maximum safe compression ratio.",
                     )
         except Exception as e:
             return ParsedDocument(

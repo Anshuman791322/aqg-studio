@@ -197,7 +197,7 @@ CREATE TABLE public.questions (
 ```
 
 ### 3.10 `evaluations`
-Automated pedagogical quality scorecards across 5 core dimensions.
+Automated pedagogical quality scorecards across 10 dimensions (correctness, groundedness, clarity, relevance, difficulty alignment, Bloom alignment, distractor quality, duplication risk, overall quality).
 ```sql
 CREATE TABLE public.evaluations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -212,7 +212,7 @@ CREATE TABLE public.evaluations (
     distractor_quality_score NUMERIC(3,2),
     duplication_score NUMERIC(3,2),
     overall_quality_score NUMERIC(3,2) NOT NULL,
-    decision TEXT NOT NULL CHECK (decision IN ('PASS', 'REVISE', 'FAIL')),
+    decision TEXT NOT NULL CHECK (decision IN ('PASS', 'REVISE', 'FAIL', 'ACCEPT', 'REFINE', 'REGENERATE')),
     feedback JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now()),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT timezone('utc'::text, now())
@@ -227,7 +227,7 @@ CREATE TABLE public.jobs (
     user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
     resource_type TEXT NOT NULL CHECK (resource_type IN ('document', 'assessment', 'export')),
     resource_id UUID NOT NULL,
-    job_type TEXT NOT NULL CHECK (job_type IN ('document_processing', 'knowledge_analysis', 'question_planning', 'question_generation', 'question_evaluation', 'export_generation')),
+    job_type TEXT NOT NULL CHECK (job_type IN ('document_processing', 'knowledge_analysis', 'question_planning', 'question_generation', 'question_evaluation', 'assessment_generation', 'export_generation')),
     status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
     progress NUMERIC(5,2) NOT NULL DEFAULT 0.00,
     current_step TEXT,

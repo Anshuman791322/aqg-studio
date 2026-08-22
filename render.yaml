@@ -1,0 +1,66 @@
+# Render Blueprint Specification for AQG Studio Backend
+# Zero-cost Hobby / Starter tier deployment configuration
+# https://render.com/docs/blueprint-spec
+
+version: "1"
+
+services:
+  - type: web
+    name: aqg-studio-backend
+    runtime: python
+    rootDir: backend
+    plan: free
+    region: oregon
+    buildCommand: "pip install --upgrade pip && pip install -r requirements.txt"
+    startCommand: "uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1"
+    healthCheckPath: /health/live
+    autoDeploy: true
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      - key: LOG_FORMAT
+        value: json
+      - key: BACKEND_CORS_ORIGINS
+        sync: false
+        value: "https://aqg-studio.vercel.app,http://localhost:3000"
+
+      # Supabase PostgreSQL & Auth Credentials
+      - key: DATABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET_DOCUMENTS
+        value: user-documents
+      - key: SUPABASE_STORAGE_BUCKET_EXPORTS
+        value: generated-exports
+
+      # AI Provider Gateways (Zero Secrets in Git)
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: LLM_PROVIDER_ORDER
+        value: "openrouter,nvidia"
+      - key: EMBEDDING_PROVIDER
+        value: fastembed
+
+      # Security & Quota Controls
+      - key: BURST_RATE_LIMIT_PER_MINUTE
+        value: "120"
+      - key: MAX_ASSESSMENTS_PER_DAY
+        value: "10"
+      - key: MAX_QUESTIONS_PER_ASSESSMENT
+        value: "50"
+      - key: MAX_LLM_CALLS_PER_ASSESSMENT
+        value: "30"
