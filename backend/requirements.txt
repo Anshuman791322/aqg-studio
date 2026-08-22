@@ -26,3 +26,5 @@ pytest-asyncio>=0.24.0
 aiosqlite>=0.20.0
 ruff>=0.6.5
 mypy>=1.11.2
+types-python-jose>=3.3.4
+types-passlib>=1.7.7
